@@ -74,15 +74,7 @@ list(APPEND ALL_DLLS "")
 # Propagate configuration to submodules.
 if(ENABLE_CHRONO_PROGRAMS)
   message(STATUS "==== Chrono programs ====")
- add_subdirectory(src/demos/irrlicht)
-endif()
-if(ENABLE_VEHICLE_PROGRAMS)
-  message(STATUS "==== Chrono::Vehicle programs ====")
-  add_subdirectory(src/demos/vehicle)
-endif()
-if(ENABLE_FEA_PROGRAMS)
-  message(STATUS "==== Chrono::FEA programs ====")
-  #add_subdirectory(FEA)
+ add_subdirectory(src)
 endif()
 
 #--------------------------------------------------------------

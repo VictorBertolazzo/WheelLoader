@@ -1,123 +1,63 @@
-#=============================================================================
-#
-# CMake configuration file for all Chrono libraries, demos, and tests.
-#
-#=============================================================================
 
+SET(MODELS
+  demo_IRR_fel
+  test_mesh
+  test_normal
+  zBarlinkage)
 
-#------------------------------------------------------------
-# Propagates the CMake build to other directories
-#------------------------------------------------------------
+#--------------------------------------------------------------
+# Find the Chrono package with required components
+#--------------------------------------------------------------
 
-# Let all modules have access to the headers of the main library
-include_directories(${CH_INCLUDES})
+# Invoke find_package in CONFIG mode
 
-# Add directories to build various optional modules.  Each module is supposed
-# to provide an option for enabling that particular module.
-add_subdirectory(chrono_vehicle)
+find_package(Chrono
+             COMPONENTS Irrlicht Opengl Parallel
+             CONFIG
+)
 
-# Add directories for model libraries
-add_subdirectory(chrono_models)
+# If Chrono and/or the required component(s) were not found, return now.
 
-# Add directories for demo programs, unit test programs, and additional test programs.
-  add_subdirectory(demos)
-
-#------------------------------------------------------------
-# Generate and install the Chrono configuration header
-#------------------------------------------------------------
-
-# Prepare substitution variables for the modules that were enabled
-# TODO: the following tests should be more precise (we should test
-#       that a particular module was successfully built, not just
-#       enabled)
-
-if(ENABLE_UNIT_CASCADE)
-  set(CHRONO_CASCADE "#define CHRONO_CASCADE")
-else()
-  set(CHRONO_CASCADE "#undef CHRONO_CASCADE")
+if(NOT Chrono_FOUND)
+  message("Could not find requirements for Chrono tutorials")
+  return()
 endif()
 
-if(ENABLE_MODULE_COSIMULATION)
-  set(CHRONO_COSIMULATION "#define CHRONO_COSIMULATION")
-else()
-  set(CHRONO_COSIMULATION "#undef CHRONO_COSIMULATION")
+include_directories(${CHRONO_INCLUDE_DIRS})
+
+#--------------------------------------------------------------
+# Append to the parent's list of DLLs (and make it visible up)
+#--------------------------------------------------------------
+
+list(APPEND ALL_DLLS "${CHRONO_DLLS}")
+set(ALL_DLLS "${ALL_DLLS}" PARENT_SCOPE)
+
+#--------------------------------------------------------------
+# Compilation flags
+#--------------------------------------------------------------
+
+set(COMPILE_FLAGS ${CHRONO_CXX_FLAGS})
+
+# Disable some warnings triggered by Irrlicht (Windows only)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    SET(COMPILE_FLAGS "${COMPILE_FLAGS} /wd4275")
 endif()
 
-if(ENABLE_MODULE_FEA)
-  set(CHRONO_FEA "#define CHRONO_FEA")
-else()
-  set(CHRONO_FEA "#undef CHRONO_FEA")
-endif()
 
-if(ENABLE_MODULE_IRRLICHT)
-  set(CHRONO_IRRLICHT "#define CHRONO_IRRLICHT")
-else()
-  set(CHRONO_IRRLICHT "#undef CHRONO_IRRLICHT")
-endif()
+foreach(PROGRAM ${MODELS})
 
-if(ENABLE_MODULE_MATLAB)
-  set(CHRONO_MATLAB "#define CHRONO_MATLAB")
-else()
-  set(CHRONO_MATLAB "#undef CHRONO_MATLAB")
-endif()
+  message(STATUS "...add ${PROGRAM}")
 
-if(ENABLE_MODULE_MKL)
-  set(CHRONO_MKL "#define CHRONO_MKL")
-else()
-  set(CHRONO_MKL "#undef CHRONO_MKL")
-endif()
+  add_executable(${PROGRAM}  "${PROGRAM}.cpp")
+  source_group(""  FILES "${PROGRAM}.cpp")
 
-if(ENABLE_MODULE_PARALLEL)
-  set(CHRONO_PARALLEL "#define CHRONO_PARALLEL")
-else()
-  set(CHRONO_PARALLEL "#undef CHRONO_PARALLEL")
-endif()
+  set_target_properties(${PROGRAM} PROPERTIES
+    FOLDER demos
+    COMPILE_FLAGS "${COMPILE_FLAGS}"
+    COMPILE_DEFINITIONS "CHRONO_DATA_DIR=\"${CHRONO_DATA_DIR}\""
+    LINK_FLAGS "${COMPILE_FLAGS} ${CHRONO_LINKER_FLAGS}"
+  )
 
-if(ENABLE_MODULE_OPENGL)
-  set(CHRONO_OPENGL "#define CHRONO_OPENGL")
-else()
-  set(CHRONO_OPENGL "#undef CHRONO_OPENGL")
-endif()
+  target_link_libraries(${PROGRAM} ${CHRONO_LIBRARIES})
 
-if(ENABLE_MODULE_OGRE)
-  set(CHRONO_OGRE "#define CHRONO_OGRE")
-else()
-  set(CHRONO_OGRE "#undef CHRONO_OGRE")
-endif()
-
-if(ENABLE_MODULE_POSTPROCESS)
-  set(CHRONO_POSTPROCESS "#define CHRONO_POSTPROCESS")
-else()
-  set(CHRONO_POSTPROCESS "#undef CHRONO_POSTPROCESS")
-endif()
-
-if(ENABLE_MODULE_PYTHON)
-  set(CHRONO_PYTHON "#define CHRONO_PYTHON")
-else()
-  set(CHRONO_PYTHON "#undef CHRONO_PYTHON")
-endif()
-
-if(ENABLE_MODULE_VEHICLE)
-  set(CHRONO_VEHICLE "#define CHRONO_VEHICLE")
-else()
-  set(CHRONO_VEHICLE "#undef CHRONO_VEHICLE")
-endif()
-
-if(ENABLE_MODULE_FSI)
-  set(CHRONO_FSI "#define CHRONO_FSI")
-else()
-  set(CHRONO_FSI "#undef CHRONO_FSI")
-endif()
-
-if(ENABLE_OPENMP)
-  set(CHRONO_OPENMP_ENABLED "#define CHRONO_OPENMP_ENABLED")
-else()
-  set(CHRONO_OPENMP_ENABLED "#undef CHRONO_OPENMP_ENABLED")
-endif()
-
-if(ENABLE_TBB)
-  set(CHRONO_TBB_ENABLED "#define CHRONO_TBB_ENABLED")
-else()
-  set(CHRONO_TBB_ENABLED "#undef CHRONO_TBB_ENABLED")
-endif()
-
+endforeach(PROGRAM)
