@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
 		std::vector<Points> p_int;
 
 		std::string lineext;
-		const std::string& filenameext = out_dir + "data/test_ext.txt";
+		const std::string& filenameext = out_dir + "data/ext_profile.txt";
 		std::ifstream ifileext(filenameext.c_str());
 		while (std::getline(ifileext, lineext)) {
 			std::istringstream iss(lineext);
@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
 		ifileext.close();
 
 		std::string lineint;
-		const std::string& filenameint = out_dir + "data/test_int.txt";
+		const std::string& filenameint = out_dir + "data/int_profile.txt";
 		std::ifstream ifileint(filenameint.c_str());
 		while (std::getline(ifileint, lineint)) {
 			std::istringstream iss(lineint);
@@ -306,6 +306,156 @@ int main(int argc, char* argv[]) {
 						bucket->GetCollisionModel()->ClearModel();
 						bucket->GetCollisionModel()->AddTriangleMesh(m_trimesh, true, false, ChVector<>(0, 0, 0));
 						bucket->GetCollisionModel()->BuildModel();
+		}
+		// Right Bucket Side-->Test Normals
+		for (int iter = 0; iter < p_int.size() - 1; iter++) {
+			// trimesh Usage
+			geometry::ChTriangleMeshConnected m_trimesh;
+			//cuneo like meshes
+			int n_verts = 6;
+			int n_faces = 8;
+			// Resize mesh arrays.
+			m_trimesh.getCoordsVertices().resize(n_verts);
+			m_trimesh.getCoordsNormals().resize(n_verts);
+			m_trimesh.getCoordsUV().resize(n_verts);
+			m_trimesh.getCoordsColors().resize(n_verts);
+
+			m_trimesh.getIndicesVertexes().resize(n_faces);
+			m_trimesh.getIndicesNormals().resize(n_faces);
+			// Load mesh vertices.
+			float hy = .5; float ty = .05;
+			m_trimesh.getCoordsVertices()[0] = ChVector<>(p_int[iter].mx, -hy / 2 -ty/2, p_int[iter].mz);
+			m_trimesh.getCoordsVertices()[1] = ChVector<>(p_int[iter + 1].mx, -hy / 2 -ty/2, p_int[iter + 1].mz);
+			m_trimesh.getCoordsVertices()[2] = ChVector<>(.70, -hy / 2 -ty/2, .25); // coord of the mid point,outer face of the tab
+
+			m_trimesh.getCoordsVertices()[3] = ChVector<>(p_int[iter].mx, -hy / 2 + ty / 2, p_int[iter].mz);
+			m_trimesh.getCoordsVertices()[4] = ChVector<>(p_int[iter + 1].mx, -hy / 2 + ty / 2, p_int[iter + 1].mz);
+			m_trimesh.getCoordsVertices()[5] = ChVector<>(.70, -hy / 2 + ty / 2, .25); // coord of the mid point,inner face of the tab
+
+																					   // Load mesh faces
+																					   // Specify the face vertices counter-clockwise.
+																					   // Set the normal indices same as the vertex indices.
+			std::cout << "Load faces...normals have to be tested" << std::endl;
+			auto ones = ChVector<int>(1, 1, 1);
+			m_trimesh.getIndicesVertexes()[0] = ChVector<int>(1,2,3) - ones;//outer side
+			m_trimesh.getIndicesVertexes()[1] = ChVector<int>(4,5,6) - ones;//inner side
+			m_trimesh.getIndicesVertexes()[2] = ChVector<int>(1,6,4) - ones;//sand side t1
+			m_trimesh.getIndicesVertexes()[3] = ChVector<int>(1,3,6) - ones;//sand side t2
+			m_trimesh.getIndicesVertexes()[4] = ChVector<int>(1, 4, 5) - ones;//upper side t1
+			m_trimesh.getIndicesVertexes()[5] = ChVector<int>(1, 5, 2) - ones;//upper side t2
+			m_trimesh.getIndicesVertexes()[6] = ChVector<int>(2,5,6) - ones;//joint side t1
+			m_trimesh.getIndicesVertexes()[7] = ChVector<int>(2,6,3) - ones;//joint side t2
+
+			// Let use the same
+			for (int j = 0; j < n_faces; j++) {
+				m_trimesh.getIndicesNormals()[j] = m_trimesh.getIndicesVertexes()[j];
+			}
+			// Readibility aliases
+			std::vector<ChVector<> >& vertices = m_trimesh.getCoordsVertices();
+			std::vector<ChVector<> >& normals = m_trimesh.getCoordsNormals();
+			std::vector<ChVector<int> >& idx_vertices = m_trimesh.getIndicesVertexes();
+			std::vector<ChVector<int> >& idx_normals = m_trimesh.getIndicesNormals();
+
+			for (unsigned int it = 0; it < n_faces; ++it) {
+				// Calculate the triangle normal as a normalized cross product.
+				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y] - vertices[idx_vertices[it].x], vertices[idx_vertices[it].z] - vertices[idx_vertices[it].x]);
+				nrm.Normalize();
+				// Increment the normals of all incident vertices by the face normal
+				normals[idx_normals[it].x] += nrm;
+				normals[idx_normals[it].y] += nrm;
+				normals[idx_normals[it].z] += nrm;
+				// Increment the count of all incident vertices by 1
+				//accumulators[idx_normals[it].x] += 1;
+				//accumulators[idx_normals[it].y] += 1;
+				//accumulators[idx_normals[it].z] += 1;
+			}
+			auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
+			trimesh_shape->SetMesh(m_trimesh);
+			trimesh_shape->SetName("triangular_mesh");
+			bucket->AddAsset(trimesh_shape);
+
+
+			// Create contact geometry.
+			bucket->GetCollisionModel()->ClearModel();
+			bucket->GetCollisionModel()->AddTriangleMesh(m_trimesh, true, false, ChVector<>(0, 0, 0));
+			bucket->GetCollisionModel()->BuildModel();
+
+
+		}
+		// Left Bucket Side-->Test Normals
+		for (int iter = 0; iter < p_int.size() - 1; iter++) {
+			// trimesh Usage
+			geometry::ChTriangleMeshConnected m_trimesh;
+			//cuneo like meshes
+			int n_verts = 6;
+			int n_faces = 8;
+			// Resize mesh arrays.
+			m_trimesh.getCoordsVertices().resize(n_verts);
+			m_trimesh.getCoordsNormals().resize(n_verts);
+			m_trimesh.getCoordsUV().resize(n_verts);
+			m_trimesh.getCoordsColors().resize(n_verts);
+
+			m_trimesh.getIndicesVertexes().resize(n_faces);
+			m_trimesh.getIndicesNormals().resize(n_faces);
+			// Load mesh vertices.
+			float hy = .5; float ty = .05;
+			m_trimesh.getCoordsVertices()[0] = ChVector<>(p_int[iter].mx, +hy / 2 - ty / 2, p_int[iter].mz);
+			m_trimesh.getCoordsVertices()[1] = ChVector<>(p_int[iter + 1].mx, +hy / 2 - ty / 2, p_int[iter + 1].mz);
+			m_trimesh.getCoordsVertices()[2] = ChVector<>(.70, +hy / 2 - ty / 2, .25); // coord of the mid point,outer face of the tab
+
+			m_trimesh.getCoordsVertices()[3] = ChVector<>(p_int[iter].mx, +hy / 2 + ty / 2, p_int[iter].mz);
+			m_trimesh.getCoordsVertices()[4] = ChVector<>(p_int[iter + 1].mx, +hy / 2 + ty / 2, p_int[iter + 1].mz);
+			m_trimesh.getCoordsVertices()[5] = ChVector<>(.70, +hy / 2 + ty / 2, .25); // coord of the mid point,inner face of the tab
+
+																					   // Load mesh faces
+																					   // Specify the face vertices counter-clockwise.
+																					   // Set the normal indices same as the vertex indices.
+			std::cout << "Load faces...normals have to be tested" << std::endl;
+			auto ones = ChVector<int>(1, 1, 1);
+			m_trimesh.getIndicesVertexes()[0] = ChVector<int>(1, 2, 3) - ones;//outer side
+			m_trimesh.getIndicesVertexes()[1] = ChVector<int>(4, 5, 6) - ones;//inner side
+			m_trimesh.getIndicesVertexes()[2] = ChVector<int>(1, 6, 4) - ones;//sand side t1
+			m_trimesh.getIndicesVertexes()[3] = ChVector<int>(1, 3, 6) - ones;//sand side t2
+			m_trimesh.getIndicesVertexes()[4] = ChVector<int>(1, 4, 5) - ones;//upper side t1
+			m_trimesh.getIndicesVertexes()[5] = ChVector<int>(1, 5, 2) - ones;//upper side t2
+			m_trimesh.getIndicesVertexes()[6] = ChVector<int>(2, 5, 6) - ones;//joint side t1
+			m_trimesh.getIndicesVertexes()[7] = ChVector<int>(2, 6, 3) - ones;//joint side t2
+
+																			  // Let use the same
+			for (int j = 0; j < n_faces; j++) {
+				m_trimesh.getIndicesNormals()[j] = m_trimesh.getIndicesVertexes()[j];
+			}
+			// Readibility aliases
+			std::vector<ChVector<> >& vertices = m_trimesh.getCoordsVertices();
+			std::vector<ChVector<> >& normals = m_trimesh.getCoordsNormals();
+			std::vector<ChVector<int> >& idx_vertices = m_trimesh.getIndicesVertexes();
+			std::vector<ChVector<int> >& idx_normals = m_trimesh.getIndicesNormals();
+
+			for (unsigned int it = 0; it < n_faces; ++it) {
+				// Calculate the triangle normal as a normalized cross product.
+				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y] - vertices[idx_vertices[it].x], vertices[idx_vertices[it].z] - vertices[idx_vertices[it].x]);
+				nrm.Normalize();
+				// Increment the normals of all incident vertices by the face normal
+				normals[idx_normals[it].x] += nrm;
+				normals[idx_normals[it].y] += nrm;
+				normals[idx_normals[it].z] += nrm;
+				// Increment the count of all incident vertices by 1
+				//accumulators[idx_normals[it].x] += 1;
+				//accumulators[idx_normals[it].y] += 1;
+				//accumulators[idx_normals[it].z] += 1;
+			}
+			auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
+			trimesh_shape->SetMesh(m_trimesh);
+			trimesh_shape->SetName("triangular_mesh");
+			bucket->AddAsset(trimesh_shape);
+
+
+			// Create contact geometry.
+			bucket->GetCollisionModel()->ClearModel();
+			bucket->GetCollisionModel()->AddTriangleMesh(m_trimesh, true, false, ChVector<>(0, 0, 0));
+			bucket->GetCollisionModel()->BuildModel();
+
+
 		}
 
 	
