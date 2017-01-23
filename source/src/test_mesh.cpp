@@ -1,29 +1,3 @@
-//
-// PROJECT CHRONO - http://projectchrono.org
-//
-// Copyright (c) 2010-2011 Alessandro Tasora
-// Copyright (c) 2013 Project Chrono
-// All rights reserved.
-//
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file at the top level of the distribution
-// and at http://projectchrono.org/license-chrono.txt.
-//
-
-///////////////////////////////////////////////////
-//
-//   Demo code about
-//
-//     - based on demo_forklift.cpp(no more)	
-//
-//	 CHRONO
-//   ------
-//   Multibody dinamics engine
-//
-// ------------------------------------------------
-//             http://www.projectchrono.org
-// ------------------------------------------------
-///////////////////////////////////////////////////
 
 #include <iostream>//Add 
 
@@ -393,6 +367,7 @@ int main(int argc, char* argv[]) {
 			m_trimesh.getCoordsVertices().resize(n_verts);
 			m_trimesh.getCoordsNormals().resize(n_verts);
 			m_trimesh.getCoordsUV().resize(n_verts);
+
 			m_trimesh.getCoordsColors().resize(n_verts);
 
 			m_trimesh.getIndicesVertexes().resize(n_faces);

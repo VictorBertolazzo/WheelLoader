@@ -25,10 +25,8 @@
 // ------------------------------------------------
 ///////////////////////////////////////////////////
 
-#include <iostream>//
+#include <iostream>//Add 
 
-#include "chrono/assets/ChTriangleMeshShape.h"
-#include "chrono/collision/ChCCollisionUtils.h"
 #include "chrono/core/ChRealtimeStep.h"
 #include "chrono/physics/ChSystem.h"
 #include "chrono/physics/ChBodyEasy.h"
@@ -47,24 +45,15 @@
 #include <irrlicht.h>
 
 #include "chrono_opengl/ChOpenGLWindow.h"
+#include "chrono_parallel/physics/ChSystemParallel.h"
 
 
-// Use the namespaces of Chrono
 using namespace chrono;
-using namespace chrono::irrlicht;
 using namespace chrono::collision;
 
-// Use the main namespaces of Irrlicht
-using namespace irr;
-using namespace irr::core;
-using namespace irr::scene;
-using namespace irr::video;
-using namespace irr::io;
-using namespace irr::gui;
+//#define USE_PENALTY
 
-#define USE_PENALTY
 enum BucketSide { LEFT, RIGHT };
-
 
 struct Points {
 	Points() {}
@@ -171,7 +160,7 @@ void AddBucketHull(std::vector<Points> p_ext, std::vector<Points> p_int, std::sh
 
 
 		bucket->GetCollisionModel()->AddConvexHull(cloud, ChVector<>(0, 0, 0), QUNIT);
-
+		bucket->GetCollisionModel()->BuildModel();
 
 		auto shape = std::make_shared<ChTriangleMeshShape>();
 		collision::ChConvexHullLibraryWrapper lh;
@@ -180,6 +169,7 @@ void AddBucketHull(std::vector<Points> p_ext, std::vector<Points> p_int, std::sh
 
 		//bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 	}
+
 }
 void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<ChBody> bucket) {
 
@@ -213,7 +203,8 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 		cloud.push_back(ChVector<>(.70, width + th, .25));
 
 		bucket->GetCollisionModel()->AddConvexHull(cloud, ChVector<>(0, 0, 0), QUNIT);
-		
+		bucket->GetCollisionModel()->BuildModel();
+
 		auto shape = std::make_shared<ChTriangleMeshShape>();
 		collision::ChConvexHullLibraryWrapper lh;
 		lh.ComputeHull(cloud, shape->GetMesh());
@@ -293,15 +284,16 @@ int main(int argc, char* argv[]) {
 	materialDEM->SetFriction(0.4f);
 	materialDEM->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
 
-								  // 0. Set the path to the Chrono data folder
+	// 0. Set the path to the Chrono data folder
 	SetChronoDataPath(CHRONO_DATA_DIR);
 
 	// 1. Create the system
 #ifdef USE_PENALTY
-	ChSystemDEM system;
+	ChSystemParallelDEM system;
 #else
-	ChSystem system;
+	ChSystemParallelDVI system;
 #endif
+
 
 	system.Set_G_acc(ChVector<>(.0,.0,.0));
 	// GROUND
@@ -438,21 +430,20 @@ int main(int argc, char* argv[]) {
 		bucket->SetName("benna");
 		bucket->SetIdentifier(4);
 		bucket->SetMass(200.0);//not confirmed data
-		bucket->SetInertiaXX(ChVector<>(20, 50, 20));//not confirmed data
+		bucket->SetInertiaXX(ChVector<>(200, 500, 200));//not confirmed data
 		bucket->SetPos(POS_lift2bucket);
 		//bucket->SetFrame_COG_to_REF(ChFrame<> (bucket->GetFrame_REF_to_abs().GetInverse() * COG_bucket,QUNIT));
-		bucket->SetFrame_COG_to_REF(ChFrame<>(ChVector<>(.35, .0, .2), QUNIT));//tentative 
+		bucket->SetFrame_COG_to_REF(ChFrame<>(ChVector<>(.35,.0,.2),QUNIT));//tentative 
 		// Create contact geometry.
 		bucket->SetCollide(true);
 		bucket->GetCollisionModel()->ClearModel();
 		AddBucketHull(p_ext, p_int, bucket);
 		AddCapsHulls(p_int, BucketSide::LEFT, bucket);
 		AddCapsHulls(p_int, BucketSide::RIGHT, bucket);
-		bucket->GetCollisionModel()->BuildModel();
 #ifdef USE_PENALTY
 		bucket->SetMaterialSurface(materialDEM);
 #else
-		bucket->SetMaterialSurface(material_test);
+		bucket->SetMaterialSurface(material);
 #endif
 		bucket->GetCollisionModel()->BuildModel();
 		//bucket->SetMaterialSurface(materialDEM);
@@ -461,9 +452,7 @@ int main(int argc, char* argv[]) {
 		auto bucket_mesh_shape = std::make_shared<ChTriangleMeshShape>();
 		bucket_mesh_shape->SetMesh(bucket_mesh);
 		bucket->AddAsset(bucket_mesh_shape);
-		system.AddBody(bucket);
 
-		
 		// CHASSIS
 		auto chassis = std::shared_ptr<ChBody>(system.NewBody());
 		system.AddBody(chassis);
@@ -483,16 +472,16 @@ int main(int argc, char* argv[]) {
 						chassis_asset->GetSphereGeometry().rad = .05;//asset
 						chassis->AddAsset(chassis_asset);
 
-		
+						
 						
 
 						
 
 // 3. Add joint constraints
 			// LIFT-ROD  up revjoint-->IT's NOT A REV JOINT!! I keep it as a reminder.
-						auto rev_lift2lever = std::make_shared<ChLinkLockRevolute>();
-						rev_lift2lever->SetName("revolute_lift2lever");
-						rev_lift2lever->Initialize(rod, lift, ChCoordsys<>(POS_lift2lever, z2y >>rot3.Get_A_quaternion() ));
+						//auto rev_lift2lever = std::make_shared<ChLinkLockRevolute>();
+						//rev_lift2lever->SetName("revolute_lift2lever");
+						//rev_lift2lever->Initialize(rod, lift, ChCoordsys<>(POS_lift2lever, z2y >>rot3.Get_A_quaternion() ));
 						//system.AddLink(rev_lift2lever);
 			// LIFT-ROD spring(it simulates the actuator)
 						auto springdamper_ground_ball = std::make_shared<ChLinkSpring>();
@@ -507,16 +496,16 @@ int main(int argc, char* argv[]) {
 						lin_lift2rod->SetName("linear_chassis2lift");
 						lin_lift2rod->Initialize(rod, lift, false, ChCoordsys<>(POS_lift2lever, z2x >> rot11.Get_A_quaternion()), ChCoordsys<>(PIS_lift2lever, z2x >> rot11.Get_A_quaternion()));//m2 is the master
 						lin_lift2rod->Set_lin_offset(Vlength(POS_lift2lever - PIS_lift2lever));
-// No way
+// Sì way
 						auto bp_asset = std::make_shared<ChPointPointSegment>();//asset
 						lin_lift2rod->AddAsset(bp_asset);
 //
 						auto legge1 = std::make_shared<ChFunction_Ramp>();					
-						legge1->Set_ang(1.0);
+						legge1->Set_ang(.50);
 						auto legge2 = std::make_shared<ChFunction_Const>();
 						//legge2->Set_yconst(Vlength(POS_lift2lever - PIS_lift2lever) + 1.0);//Does it take the actual value or that one at the beginning?
 						auto legge3 = std::make_shared<ChFunction_Ramp>();
-						legge3->Set_ang(-1.0);//Does it take the actual value or that one at the beginning?
+						legge3->Set_ang(-.50);//Does it take the actual value or that one at the beginning?
 						auto tilt_law = std::make_shared<ChFunction_Sequence>();
 						tilt_law->InsertFunct(legge1, 1.0, 1, true);
 						tilt_law->InsertFunct(legge2, 1.0, 1., true);
@@ -530,13 +519,13 @@ int main(int argc, char* argv[]) {
 						auto tilt_law_test = std::make_shared<ChFunction_Const>();
 						tilt_law_test->Set_yconst(Vlength(VNULL));
 						// end test_law
-						lin_lift2rod->Set_dist_funct(tilt_law);
+						lin_lift2rod->Set_dist_funct(tilt_law_test);
 
 						//system.AddLink(springdamper_ground_ball);
 						system.Add(lin_lift2rod);
 			// LIFT-ROD inthe middle revjoint 
 						auto rev_lift2rod = std::make_shared<ChLinkLockRevolute>();
-						rev_lift2lever->SetName("revolute_lift2rod");
+						rev_lift2rod->SetName("revolute_lift2rod");
 						rev_lift2rod->Initialize(rod, lift, ChCoordsys<>(POS_lift2rod, z2y >> rot3.Get_A_quaternion()));
 						system.AddLink(rev_lift2rod);
 			// ROD-LINK revjoint
@@ -584,7 +573,6 @@ int main(int argc, char* argv[]) {
 						auto lift_law_sine = std::make_shared<ChFunction_Sine>();
 						lift_law_sine->Set_w(1.0472);
 						lift_law_sine->Set_amp(.5*Vlength(INS_ch2lift - PIS_ch2lift));
-						
 
 						lin_ch2lift->AddAsset(std::make_shared<ChPointPointSegment>());
 
@@ -592,7 +580,7 @@ int main(int argc, char* argv[]) {
 						auto lift_law_test = std::make_shared<ChFunction_Const>();
 						lift_law_test->Set_yconst(Vlength(VNULL));
 						// end test_law
-						lin_ch2lift->Set_dist_funct(lift_law_sine);
+						lin_ch2lift->Set_dist_funct(lift_law_sine);//Sine function test for lifting
 
 						system.AddLink(lin_ch2lift);
 
@@ -610,92 +598,100 @@ int main(int argc, char* argv[]) {
 						chassis_law->Set_ang(.10);//it'll act as the chassis speed
 						lin_fix2ch->Set_dist_funct(chassis_law);
 
+
+
+						system.ShowHierarchy(GetLog());
+
+
+						// Create the ball
+						double radius = .25;
+						auto ball = std::shared_ptr<ChBody>(system.NewBody());
+						ball->SetMass(1000);
+						ball->SetPos(ChVector<>(7.0,.0,.55));
+						ball->SetPos_dt(ChVector<>(-1.,.0,.0));
+						ball->SetBodyFixed(false);
+#ifdef USE_PENALTY
+						ball->SetMaterialSurface(materialDEM);
+#else
+						ball->SetMaterialSurface(material);
+#endif
+						ball->SetCollide(true);
+
+						ball->GetCollisionModel()->ClearModel();
+						ball->GetCollisionModel()->AddSphere(radius);
+						ball->GetCollisionModel()->BuildModel();
+
+						ball->SetInertiaXX(0.4 * 1000 * radius * radius * ChVector<>(1, 1, 1));
+
+						auto sphere = std::make_shared<ChSphereShape>();
+						sphere->GetSphereGeometry().rad = radius;
+						ball->AddAsset(sphere);
+
+						auto mtexture = std::make_shared<ChTexture>();
+						mtexture->SetTextureFilename(GetChronoDataFile("bluwhite.png"));
+						ball->AddAsset(mtexture);
+
+						system.AddBody(ball);
+
+
+
+						int threads = 8;
+						uint max_iteration = 300;
+						real tolerance = 1e-3;
+
+						// Set number of threads.
+						//int max_threads = CHOMPfunctions::GetNumProcs();
+						//if (threads > max_threads)
+						//	threads = max_threads;
+						//system.SetParallelThreadNumber(threads);
+						//CHOMPfunctions::SetNumThreads(threads);
+		// 4. Solver Settings
+#ifdef USE_PENALTY
+						system.GetSettings()->solver.max_iteration_bilateral = 200;
+						system.GetSettings()->solver.tolerance = tolerance;
+
+						system.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
+						system.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
+
+#else
+						system.GetSettings()->solver.solver_mode = SLIDING;
+						system.GetSettings()->solver.max_iteration_normal = max_iteration / 3;
+						system.GetSettings()->solver.max_iteration_sliding = max_iteration / 3;
+						system.GetSettings()->solver.max_iteration_spinning = 0;
+						system.GetSettings()->solver.max_iteration_bilateral = max_iteration / 3;
+						system.GetSettings()->solver.tolerance = tolerance;
+						system.GetSettings()->solver.alpha = 0;
+						system.GetSettings()->solver.contact_recovery_speed = 10000;
+						system.ChangeSolverType(APGDREF);
+						system.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
+
+						system.GetSettings()->collision.collision_envelope = 0.01;
+						system.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
+
+#endif
+
+			
 				
 				
 				
-				
-				
-
-// 4. Write the system hierarchy to the console (default log output destination)
-	//system.ShowHierarchy(GetLog());
-
-	
-	// 5. Prepare visualization with Irrlicht
-	//    Note that Irrlicht uses left-handed frames with Y up.
-
-	
-	
-	
-	// Create the Irrlicht application and set-up the camera.
-	ChIrrApp * application = new ChIrrApp(
-		&system,                               // pointer to the mechanical system
-		L"WL First Example",                // title of the Irrlicht window
-		core::dimension2d<u32>(800, 600),      // window dimension (width x height)
-		false,                                 // use full screen?
-		true);                                 // enable shadows?
-	application->AddTypicalLogo();
-	application->AddTypicalSky();
-	application->AddTypicalLights();
-	application->AddTypicalCamera(core::vector3df(0,+3,6),core::vector3df(2, 0, 0)); //'camera' location            // "look at" location
-											   // Let the Irrlicht application convert the visualization assets.
-	application->AssetBindAll();
-	application->AssetUpdateAll();
-    
-	application->SetTimestep(0.01);
-	application->SetTryRealtime(true);
-
-	while (application->GetDevice()->run()) {
-
-		// Irrlicht must prepare frame to draw
-		application->BeginScene();
-		// Irrlicht application draws all 3D objects and all GUI items
-		application->DrawAll();
-		// Draw an XZ grid at the global origin to add in visualization.
-		ChIrrTools::drawGrid(
-			application->GetVideoDriver(), 1, 1, 20, 20,
-			ChCoordsys<>(ChVector<>(0, 0, 0), Q_from_AngX(CH_C_PI_2)),
-			video::SColor(255, 80, 100, 100), true);
-
-		// Advance the simulation time step
-		application->DoStep();
-
-
-		// Irrlicht must finish drawing the frame
-		application->EndScene();
-	}
-
-
 
 		//5. Prepare Visualization with OpenGL
 		// Create OpenGL window and camera
 		// -------------------------------
-		
-
-/*						
-#ifdef CHRONO_OPENGL
 
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
-		gl_window.Initialize(1280, 720, "WL first example", &system);
-		gl_window.SetCamera(ChVector<>(0, 0, 5), ChVector<>(0, 0, 0), ChVector<>(0, 1, 0));
+		gl_window.Initialize(1280, 720, "Zbar linkage parallel", &system);
+		gl_window.SetCamera(ChVector<>(10, 11, 10), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
 		gl_window.SetRenderMode(opengl::SOLID);
-		gl_window.Pause();
 		
-		double time_step = 0.01;
+		double time_step = 0.001;
 		while (true) {
 			if (gl_window.Active()) {
-				if (gl_window.Running()){
-					gl_window.DoStepDynamics(time_step);
+				gl_window.DoStepDynamics(time_step);
+				gl_window.Render();
 			}
-			gl_window.Render();
 		}
-}
-		
 
-		
-#else
-
-#endif
-*/
 
     return 0;
 }

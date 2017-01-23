@@ -1,10 +1,8 @@
-#include <iostream>//Add 
+#include <iostream>
 #include <stdio.h>
 #include <vector>
 #include <cmath>
-#include <irrlicht.h>
-
-
+#include "chrono/assets/ChAssetLevel.h"
 #include "chrono/assets/ChPointPointDrawing.h"
 #include "chrono/assets/ChTexture.h"
 #include "chrono/assets/ChTriangleMeshShape.h"
@@ -13,11 +11,10 @@
 #include "chrono/physics/ChSystem.h"
 #include "chrono/physics/ChBodyEasy.h"
 #include "chrono/physics/ChLinkLinActuator.h"
-#include "chrono_irrlicht/ChBodySceneNodeTools.h"
-#include "chrono_irrlicht/ChIrrApp.h"
+#include "chrono/utils/ChUtilsCreators.h"
 #include "chrono/utils/ChUtilsGenerators.h"
 
-
+#include "chrono_parallel/physics/ChSystemParallel.h"
 
 #include "chrono_opengl/ChOpenGLWindow.h"
 
@@ -27,16 +24,8 @@
 #include "chrono/physics/ChSystemDEM.h"
 #include "chrono/physics/ChContactContainerDEM.h"
 #include "chrono/solver/ChSolverDEM.h"
-
-
-
-// Use the namespaces of Chrono
 using namespace chrono;
-using namespace chrono::irrlicht;
-
-// Use the main namespaces of Irrlicht
-using namespace irr;
-using namespace irr::core;
+using namespace chrono::collision;
 
 //#define USE_PENALTY
 
@@ -133,7 +122,7 @@ void AddBucketHull(std::vector<Points> p_ext, std::vector<Points> p_int, std::sh
 	
 	for (int iter = 0; iter < p_ext.size() - 1; iter++) {
 		std::vector<ChVector<double>> cloud;
-		double width = .5;// or halve an input
+		double width = 1.0;// or halve an input
 
 		cloud.push_back(ChVector<>(p_int[iter].mx, p_int[iter].my - width, p_int[iter].mz));
 		cloud.push_back(ChVector<>(p_int[iter + 1].mx, p_int[iter + 1].my - width, p_int[iter + 1].mz));
@@ -153,9 +142,9 @@ void AddBucketHull(std::vector<Points> p_ext, std::vector<Points> p_int, std::sh
 		auto shape = std::make_shared<ChTriangleMeshShape>();
 		collision::ChConvexHullLibraryWrapper lh;
 		lh.ComputeHull(cloud, shape->GetMesh());
-		bucket->AddAsset(shape);
+		//bucket->AddAsset(shape);
 
-		bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
+		//bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 	}
 
 }
@@ -169,10 +158,10 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	switch (side)
 	{
 	case LEFT: 
-		width = +.5;
+		width = +1.;
 		break;
 	case RIGHT:
-		width = -.5;
+		width = -1.0;
 		break;
 	default:   
 		width = .0;
@@ -196,9 +185,9 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	auto shape = std::make_shared<ChTriangleMeshShape>();
 	collision::ChConvexHullLibraryWrapper lh;
 	lh.ComputeHull(cloud, shape->GetMesh());
-	bucket->AddAsset(shape);
+	//bucket->AddAsset(shape);
 
-	bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
+	//bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 }
 }
 void AddMeshWall(std::shared_ptr<ChBody> body, const ChVector<>& dim, const ChVector<>& loc) {
@@ -287,36 +276,20 @@ int main(int argc, char* argv[]) {
 	
 	// parameters for tests
 #ifdef USE_PENALTY
-	ChSystemDEM system;
+	ChSystemParallelDEM system;
 #else
-	ChSystem system;
+	ChSystemParallelDVI system;
 #endif
 
-	system.Set_G_acc(ChVector<>(0., +10.0, 0.));
-	ChVector<> pos_ball(.5, -1.0, .1);
+	system.Set_G_acc(ChVector<>(0., -10.0, 0.));
+	ChVector<> pos_ball(.5, +2.0, .1);
 	auto material_test = material;
-	double time_step = .001;
+	double time_step = .0001;
 	double radius = .15;
 
-	// Create the Irrlicht application and set-up the camera.
-	ChIrrApp * application = new ChIrrApp(
-		&system,                               // pointer to the mechanical system
-		L"WL First Example",                // title of the Irrlicht window
-		core::dimension2d<u32>(800, 600),      // window dimension (width x height)
-		false,                                 // use full screen?
-		true);                                 // enable shadows?
-	application->AddTypicalLogo();
-	application->AddTypicalSky();
-	application->AddTypicalLights();
-	application->AddTypicalCamera(core::vector3df(0, 3, -6)); //'camera' location            // "look at" location
-																																		// Let the Irrlicht application convert the visualization assets.
-
-	// This means that contactforces will be shown in Irrlicht application
-	application->SetSymbolscale(1e-4);
-	application->SetContactsDrawMode(ChIrrTools::eCh_ContactsDrawMode::CONTACT_FORCES);
 
 	// Create the ball
-		auto ball = std::make_shared<ChBody>( );//.15 before
+	auto ball = std::shared_ptr<ChBody>(system.NewBody());
 		ball->SetMass(1000);
 		ball->SetPos(pos_ball);
 		ball->SetBodyFixed(false);
@@ -344,7 +317,7 @@ int main(int argc, char* argv[]) {
 		system.AddBody(ball);
 
 		// BUCKET
-		auto bucket = std::make_shared<ChBodyAuxRef>();//ChBodyAuxRef
+		auto bucket = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());
 		bucket->SetBodyFixed(true);
 		bucket->SetName("benna");
 		bucket->SetIdentifier(4);
@@ -359,37 +332,36 @@ int main(int argc, char* argv[]) {
 		//AddBucketMesh(p_ext,p_int,bucket);
 		AddBucketHull(p_ext,p_int,bucket);
 		AddCapsHulls(p_int, BucketSide::LEFT, bucket);
+		AddCapsHulls(p_int, BucketSide::RIGHT, bucket);
+#ifdef USE_PENALTY
+		bucket->SetMaterialSurface(materialDEM);
+#else
 		bucket->SetMaterialSurface(material_test);
+#endif
 		bucket->GetCollisionModel()->BuildModel();
 		//bucket->SetMaterialSurface(materialDEM);
+		geometry::ChTriangleMeshConnected bucket_mesh;
+		bucket_mesh.LoadWavefrontMesh(out_dir + "data/bucket_mod.obj", false, false);
+		auto bucket_mesh_shape = std::make_shared<ChTriangleMeshShape>();
+		bucket_mesh_shape->SetMesh(bucket_mesh);
+		bucket->AddAsset(bucket_mesh_shape);
 		system.AddBody(bucket);
 
 
-		application->AssetBindAll();
-		application->AssetUpdateAll();
-		application->SetTimestep(time_step);
-
-		while (application->GetDevice()->run()) {
-
-			// Irrlicht must prepare frame to draw
-			application->BeginScene();
-			// Irrlicht application draws all 3D objects and all GUI items
-			application->DrawAll();
-			// Draw an XZ grid at the global origin to add in visualization.
-			ChIrrTools::drawGrid(
-				application->GetVideoDriver(), 1, 1, 20, 20,
-				ChCoordsys<>(ChVector<>(0, 0, 0), Q_from_AngX(CH_C_PI_2)),
-				video::SColor(255, 80, 100, 100), true);
-
-			// Advance the simulation time step
-			application->DoStep();
 
 
-			// Irrlicht must finish drawing the frame
-			application->EndScene();
+		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
+		gl_window.Initialize(1280, 720, "Test Parallel Normal", &system);
+		gl_window.SetCamera(ChVector<>(3,-3,1), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1));
+		//gl_window.SetRenderMode(opengl::SOLID);
+		//gl_window.Pause();
+
+		while (true) {
+			if (gl_window.Active()) {
+				gl_window.DoStepDynamics(time_step);
+				gl_window.Render();
+			}
 		}
-
-
 
 		return 0;
 	}

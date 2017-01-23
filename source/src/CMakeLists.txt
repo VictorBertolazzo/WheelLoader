@@ -3,7 +3,9 @@ SET(MODELS
   demo_IRR_fel
   test_mesh
   test_normal
-  zBarlinkage)
+  test_normal_PAR
+  zBarlinkage
+  zBarlinkage_PAR)
 
 #--------------------------------------------------------------
 # Find the Chrono package with required components
