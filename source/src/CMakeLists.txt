@@ -1,6 +1,7 @@
 
 SET(MODELS
   demo_IRR_fel
+  test_granular_PAR
   test_mesh
   test_normal
   test_normal_PAR
