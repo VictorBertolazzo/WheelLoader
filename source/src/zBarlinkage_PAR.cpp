@@ -1,31 +1,4 @@
-//
-// PROJECT CHRONO - http://projectchrono.org
-//
-// Copyright (c) 2010-2011 Alessandro Tasora
-// Copyright (c) 2013 Project Chrono
-// All rights reserved.
-//
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file at the top level of the distribution
-// and at http://projectchrono.org/license-chrono.txt.
-//
-
-///////////////////////////////////////////////////
-//
-//   Demo code about
-//
-//     - based on demo_forklift.cpp(no more)	
-//
-//	 CHRONO
-//   ------
-//   Multibody dinamics engine
-//
-// ------------------------------------------------
-//             http://www.projectchrono.org
-// ------------------------------------------------
-///////////////////////////////////////////////////
-
-#include <iostream>//Add 
+#include <iostream>//Add
 
 #include "chrono/core/ChRealtimeStep.h"
 #include "chrono/physics/ChSystem.h"
@@ -46,15 +19,27 @@
 
 #include "chrono_opengl/ChOpenGLWindow.h"
 #include "chrono_parallel/physics/ChSystemParallel.h"
+//#include <vld.h>
 
+//////#define _CRTDBG_MAP_ALLOC
+//////#include <stdlib.h>
+//////#include <crtdbg.h>
+//////#ifdef _DEBUG
+//////#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+//////#define new DEBUG_NEW
+//////#endif
+//#ifdef _DEBUG
+//#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
+//// Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
+//// allocations to be of _CLIENT_BLOCK type
+//#else
+//#define DBG_NEW new
+//#endif
 
 using namespace chrono;
 using namespace chrono::collision;
-
 //#define USE_PENALTY
-
 enum BucketSide { LEFT, RIGHT };
-
 struct Points {
 	Points() {}
 	Points(float x, float y, float z)
@@ -266,6 +251,8 @@ void AddMeshWall(std::shared_ptr<ChBody> body, const ChVector<>& dim, const ChVe
 }
 
 int main(int argc, char* argv[]) {
+	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
 	std::vector<Points> p_ext;
 	std::vector<Points> p_int;
 	const std::string out_dir = "../";//Directory di Lavoro settata in $(OutDir)!!!
@@ -285,25 +272,39 @@ int main(int argc, char* argv[]) {
 	materialDEM->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
 
 	// 0. Set the path to the Chrono data folder
-	SetChronoDataPath(CHRONO_DATA_DIR);
+	//SetChronoDataPath(CHRONO_DATA_DIR);
 
 	// 1. Create the system
 #ifdef USE_PENALTY
 	ChSystemParallelDEM system;
-#else
+   #else
 	ChSystemParallelDVI system;
 #endif
 
-
+	//_CrtSetBreakAlloc(173);
 	system.Set_G_acc(ChVector<>(.0,.0,.0));
 	// GROUND
+	/*_CrtMemState s1;
+	_CrtMemState s2;
+	_CrtMemState s3;
+	_CrtMemCheckpoint(&s1);
+	*/
 	auto ground = std::shared_ptr<ChBody>(system.NewBody());
+//	std::shared_ptr<ChBody> ground(system.NewBody());
+//	_CrtMemCheckpoint(&s2);
+//
+//	if (_CrtMemDifference(&s3,&s1, &s2))
+//		_CrtMemDumpStatistics(&s3);
+////	_CrtDumpMemoryLeaks();
+//
 	system.Add(ground);
 	ground->SetBodyFixed(true);
 	ground->SetIdentifier(-1);
 	ground->SetName("ground");
-
-    /// .16 initial from chassis offset, .21 initial max height, .33 initial width 
+	//ground->SetPos(ChVector<>(0.0, 0., 0.0));
+	
+    
+	/// .16 initial from chassis offset, .21 initial max height, .33 initial width
 	// measures are in [m]
 		ChVector<> COG_chassis(0, 0, 1.575); // somewhere
 		ChVector<> COG_lift(2.0, 0., 1.05);
@@ -336,7 +337,7 @@ int main(int argc, char* argv[]) {
 		system.Add(lift);
 		lift->SetBodyFixed(false);
 		lift->SetName("lift arm");
-		lift->SetPos(COG_lift);
+		lift->SetPos(COG_lift);// trouble in debug nor in release
 		ChVector<> u1 = (COG_lift - POS_ch2lift).GetNormalized();//Normalize,not GetNormalize
 		ChVector<> w1 = Vcross(u1, VECT_Y).GetNormalized();//overkill
 		ChMatrix33<> rot1;//no control on orthogonality
@@ -364,13 +365,19 @@ int main(int argc, char* argv[]) {
 				lift_asset3->GetCylinderGeometry().p1 = lift->GetFrame_COG_to_abs().GetInverse() * INS_ch2lift;
 				lift_asset3->GetCylinderGeometry().p2 = lift->GetFrame_COG_to_abs().GetInverse() * POS_lift2bucket;
 
-				lift->AddAsset(lift_asset);
-				lift->AddAsset(lift_asset1);
-				lift->AddAsset(lift_asset2);
-				lift->AddAsset(lift_asset3);
+//				lift->AddAsset(lift_asset);
+//				lift->AddAsset(lift_asset1);
+//				lift->AddAsset(lift_asset2);
+//				lift->AddAsset(lift_asset3);
 				auto col_l = std::make_shared<ChColorAsset>();
 				col_l->SetColor(ChColor(0.2f, 0.0f, 0.0f));
-				lift->AddAsset(col_l);	
+//				lift->AddAsset(col_l);
+				geometry::ChTriangleMeshConnected lift_mesh;
+				lift_mesh.LoadWavefrontMesh(out_dir + "data/boom_mod.obj", false, false);
+				auto lift_mesh_shape = std::make_shared<ChTriangleMeshShape>();
+				lift_mesh_shape->SetMesh(lift_mesh);
+				lift->AddAsset(lift_mesh_shape);
+
 		// ROD
 		auto rod = std::shared_ptr<ChBody>(system.NewBody());
 		system.Add(rod);
@@ -433,7 +440,7 @@ int main(int argc, char* argv[]) {
 		bucket->SetInertiaXX(ChVector<>(200, 500, 200));//not confirmed data
 		bucket->SetPos(POS_lift2bucket);
 		//bucket->SetFrame_COG_to_REF(ChFrame<> (bucket->GetFrame_REF_to_abs().GetInverse() * COG_bucket,QUNIT));
-		bucket->SetFrame_COG_to_REF(ChFrame<>(ChVector<>(.35,.0,.2),QUNIT));//tentative 
+		bucket->SetFrame_COG_to_REF(ChFrame<>(ChVector<>(.35,.0,.2),QUNIT));//tentative
 		// Create contact geometry.
 		bucket->SetCollide(true);
 		bucket->GetCollisionModel()->ClearModel();
@@ -446,7 +453,6 @@ int main(int argc, char* argv[]) {
 		bucket->SetMaterialSurface(material);
 #endif
 		bucket->GetCollisionModel()->BuildModel();
-		//bucket->SetMaterialSurface(materialDEM);
 		geometry::ChTriangleMeshConnected bucket_mesh;
 		bucket_mesh.LoadWavefrontMesh(out_dir + "data/bucket_mod.obj", false, false);
 		auto bucket_mesh_shape = std::make_shared<ChTriangleMeshShape>();
@@ -472,10 +478,10 @@ int main(int argc, char* argv[]) {
 						chassis_asset->GetSphereGeometry().rad = .05;//asset
 						chassis->AddAsset(chassis_asset);
 
-						
-						
 
-						
+
+
+
 
 // 3. Add joint constraints
 			// LIFT-ROD  up revjoint-->IT's NOT A REV JOINT!! I keep it as a reminder.
@@ -500,7 +506,7 @@ int main(int argc, char* argv[]) {
 						auto bp_asset = std::make_shared<ChPointPointSegment>();//asset
 						lin_lift2rod->AddAsset(bp_asset);
 //
-						auto legge1 = std::make_shared<ChFunction_Ramp>();					
+						auto legge1 = std::make_shared<ChFunction_Ramp>();
 						legge1->Set_ang(.50);
 						auto legge2 = std::make_shared<ChFunction_Const>();
 						//legge2->Set_yconst(Vlength(POS_lift2lever - PIS_lift2lever) + 1.0);//Does it take the actual value or that one at the beginning?
@@ -523,7 +529,7 @@ int main(int argc, char* argv[]) {
 
 						//system.AddLink(springdamper_ground_ball);
 						system.Add(lin_lift2rod);
-			// LIFT-ROD inthe middle revjoint 
+			// LIFT-ROD inthe middle revjoint
 						auto rev_lift2rod = std::make_shared<ChLinkLockRevolute>();
 						rev_lift2rod->SetName("revolute_lift2rod");
 						rev_lift2rod->Initialize(rod, lift, ChCoordsys<>(POS_lift2rod, z2y >> rot3.Get_A_quaternion()));
@@ -546,7 +552,7 @@ int main(int argc, char* argv[]) {
 						ChMatrix33<> rotb2;
 						rev_link2bucket->Initialize(bucket, link, ChCoordsys<>(POS_link2bucket, z2y >> rotb2.Get_A_quaternion()));//Does it make sense?
 						system.AddLink(rev_link2bucket);
-			
+
 			// CHASSIS-LIFT revjoint
 						auto rev_ch2lift = std::make_shared<ChLinkLockRevolute>();
 						rev_ch2lift->SetName("revolute_chassis2lift");
@@ -670,10 +676,10 @@ int main(int argc, char* argv[]) {
 
 #endif
 
-			
-				
-				
-				
+
+
+
+
 
 		//5. Prepare Visualization with OpenGL
 		// Create OpenGL window and camera
@@ -683,7 +689,7 @@ int main(int argc, char* argv[]) {
 		gl_window.Initialize(1280, 720, "Zbar linkage parallel", &system);
 		gl_window.SetCamera(ChVector<>(10, 11, 10), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
 		gl_window.SetRenderMode(opengl::SOLID);
-		
+
 		double time_step = 0.001;
 		while (true) {
 			if (gl_window.Active()) {
@@ -692,6 +698,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
+		_CrtDumpMemoryLeaks();
 
     return 0;
 }
