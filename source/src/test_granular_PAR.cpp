@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 	int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
 	bool use_mat_properties = true;
-	bool render = false;
+	bool render = true;
 	bool track_granule = true;
 
 	// --------------------------
@@ -153,6 +153,10 @@ int main(int argc, char** argv) {
 	int binsX = (int)std::ceil(hdimX / radius_g) / factor;
 	int binsY = (int)std::ceil(hdimY / radius_g) / factor;
 	int binsZ = 1;
+
+    binsX = 20;
+    binsY = 20;
+    binsZ = 10;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
@@ -274,15 +278,10 @@ int main(int argc, char** argv) {
 
 	// Create a particle generator and a mixture entirely made out of spheres
 	utils::Generator gen(system);
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, .7);
+	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, 1);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
 	m1->setDefaultSize(radius_g);
-	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::CONE, .3);
-	m2->setDefaultMaterial(material_terrain);
-	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(radius_g);
-	// Set starting value for body identifiers
 	gen.setBodyIdentifier(Id_g);
 
 	// Create particles in layers until reaching the desired number of particles
@@ -341,8 +340,8 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 2.00;//.4;
-	double time_step = 1e-5;//-4
+	double time_end = 5.00;
+	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
@@ -363,7 +362,7 @@ int main(int argc, char** argv) {
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
 
-		TimingOutput(system);
+		//TimingOutput(system);
 
 		cum_sim_time += system->GetTimerStep();
 		cum_broad_time += system->GetTimerCollisionBroad();
