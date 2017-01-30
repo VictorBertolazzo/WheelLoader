@@ -59,23 +59,26 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     endif(MSVC)
 endif()
 
+#------------------------------------------------------------
+# Copy data directory to BUILD tree 
+# Install data directory 
+#------------------------------------------------------------
+
+if(MSVC OR XCODE_VERSION)
+    file(COPY ${CMAKE_SOURCE_DIR}/data/ DESTINATION ${CMAKE_BINARY_DIR}/bin/data/)
+else()
+    file(COPY ${CMAKE_SOURCE_DIR}/data/ DESTINATION ${CMAKE_BINARY_DIR}/data/)
+endif()
+
 #-----------------------------------------------------------------------------
 # Invoke CMake in subdirectories
 #-----------------------------------------------------------------------------
-
-# Options for configuring/building individual sets of programs
-option(ENABLE_CHRONO_PROGRAMS "Build the Chrono tutorial programs" ON)
-option(ENABLE_VEHICLE_PROGRAMS "Build the Chrono::Vehicle tutorial programs" ON)
-option(ENABLE_FEA_PROGRAMS "Build the Chrono::FEA tutorial programs" ON)
 
 # Keep track of all DLLs. Each submodule should append to this list.
 list(APPEND ALL_DLLS "")
 
 # Propagate configuration to submodules.
-if(ENABLE_CHRONO_PROGRAMS)
-  message(STATUS "==== Chrono programs ====")
- add_subdirectory(src)
-endif()
+add_subdirectory(src)
 
 #--------------------------------------------------------------
 # Copy DLLs
