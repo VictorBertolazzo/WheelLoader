@@ -8,7 +8,7 @@ Work Outline:
 -vehicle embedded linkage, terrain + pile interaction;
 
 Tools Versions:
-VS2015 Community Update2 64bit
+VS2015 Community Update3 64bit
 Cmake 3.7.2
 Irrlicht 1.8.2
 Glew 2.0.0
