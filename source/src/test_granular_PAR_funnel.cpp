@@ -95,37 +95,41 @@ using std::endl;
 	void AddWall(ChVector<> lower, ChVector<> upper, std::shared_ptr<ChBody> body,double r) {
 
 		std::vector<ChVector<double>> cloud;
-		double th = 0.05 ;// or halve an input
+		double th = 0.5*r ;// or halve an input
 		// if statement only on lower 
 		if(lower.x !=0. && lower.y == 0.){
-		cloud.push_back(lower + ChVector<>(-th,1.5*r/2,0.));
-		cloud.push_back(lower + ChVector<>(+th,1.5*r/2,0.));
-		cloud.push_back(lower + ChVector<>(-th,-1.5*r/2,0.));
-		cloud.push_back(lower + ChVector<>(+th,-1.5*r/2,0.));
-		      // // WE WANT 10*R
-		cloud.push_back(upper + ChVector<>(-th,1.5*r/2,0.));
-		cloud.push_back(upper + ChVector<>(+th,1.5*r/2,0.));
-		cloud.push_back(upper + ChVector<>(-th,-1.5*r/2,0.));
-		cloud.push_back(upper + ChVector<>(+th,-1.5*r/2,0.));
+			double ss = std::abs(lower.x);
+
+		cloud.push_back(lower + ChVector<>(-th,ss,0.));
+		cloud.push_back(lower + ChVector<>(+th,ss,0.));
+		cloud.push_back(lower + ChVector<>(-th,-ss,0.));
+		cloud.push_back(lower + ChVector<>(+th,-ss,0.));
+			double uu = std::abs(upper.x);
+		cloud.push_back(upper + ChVector<>(-th,uu,0.));
+		cloud.push_back(upper + ChVector<>(+th,uu,0.));
+		cloud.push_back(upper + ChVector<>(-th,-uu,0.));
+		cloud.push_back(upper + ChVector<>(+th,-uu,0.));
 		
 		}
 		
-		if(lower.x == 0. && lower.y != 0.){	
-		cloud.push_back(lower + ChVector<>(1.5*r/2,-th,0.));
-		cloud.push_back(lower + ChVector<>(1.5*r/2,+th,0.));
-		cloud.push_back(lower + ChVector<>(-1.5*r/2,-th,0.));
-		cloud.push_back(lower + ChVector<>(-1.5*r/2,+th,0.));
-		
-		cloud.push_back(upper + ChVector<>(1.5*r/2,-th,0.));
-		cloud.push_back(upper + ChVector<>(1.5*r/2,+th,0.));
-		cloud.push_back(upper + ChVector<>(-1.5*r/2,-th,0.));
-		cloud.push_back(upper + ChVector<>(-1.5*r/2,+th,0.));			
+		if(lower.x == 0. && lower.y != 0.){
+			double ss = std::abs(lower.y);
+		cloud.push_back(lower + ChVector<>(ss,-th,0.));
+		cloud.push_back(lower + ChVector<>(ss,+th,0.));
+		cloud.push_back(lower + ChVector<>(-ss,-th,0.));
+		cloud.push_back(lower + ChVector<>(-ss,+th,0.));
+			double uu = std::abs(upper.y);
+		cloud.push_back(upper + ChVector<>(uu,-th,0.));
+		cloud.push_back(upper + ChVector<>(uu,+th,0.));
+		cloud.push_back(upper + ChVector<>(-uu,-th,0.));
+		cloud.push_back(upper + ChVector<>(-uu,+th,0.));			
 		}
 
 		// Add a check on cloud.size()==8;
 
 
 		body->GetCollisionModel()->AddConvexHull(cloud, ChVector<>(0, 0, 0), QUNIT);
+		//body->GetCollisionModel()->BuildModel();
 
 		auto shape = std::make_shared<ChTriangleMeshShape>();
 		collision::ChConvexHullLibraryWrapper lh;
@@ -328,26 +332,44 @@ int main(int argc, char** argv) {
 	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(funnel);
 	funnel->SetIdentifier(-10);
+	funnel->SetPos(ChVector<>(0.,0.,2*radius_g));
 	funnel->SetMass(1);
-	funnel->SetBodyFixed(false);//false actually
+	funnel->SetBodyFixed(false);
 	funnel->SetMaterialSurface(material_terrain);
+	switch (method) {
+		// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
+	case ChMaterialSurfaceBase::DEM: {
+		funnel->GetMaterialSurfaceDEM()->SetFriction(.1f);
+		break;
+	}
+	case ChMaterialSurfaceBase::DVI: {
+		funnel->GetMaterialSurface()->SetFriction(.1f);
+		break;
+	}
+	}
 	funnel->SetCollide(true);
 	funnel->GetCollisionModel()->ClearModel();
 	// OpenGL does not accept more than ONE visualization shape per body
-	AddWall(ChVector<>(3.5*radius_g /2,.0,.0),ChVector<>(20*radius_g/2,.0,10*radius_g),funnel,radius_g);
-	AddWall(ChVector<>(0.,3.5*radius_g /2,.0),ChVector<>(0.,20*radius_g/2,10*radius_g),funnel,radius_g);
-	AddWall(ChVector<>(-3.5*radius_g /2,.0,.0),ChVector<>(-20*radius_g/2,.0,.10*radius_g),funnel,radius_g);
-	AddWall(ChVector<>(0.,-3.5*radius_g /2,.0),ChVector<>(0.,-20*radius_g/2,.10*radius_g),funnel,radius_g);
+	double half_low_size = 5.5*radius_g / 2;
+	double half_upp_size = 20 * radius_g / 2;
+	double base2base_height = 100 * radius_g;
+	AddWall(ChVector<>(half_low_size,.0,.0),ChVector<>(half_upp_size,.0,base2base_height),funnel,radius_g);
+	AddWall(ChVector<>(0.,half_low_size,.0),ChVector<>(0.,half_upp_size,base2base_height),funnel,radius_g);
+	AddWall(ChVector<>(-half_low_size,.0,.0),ChVector<>(-half_upp_size,.0,base2base_height),funnel,radius_g);
+	AddWall(ChVector<>(0.,-half_low_size,.0),ChVector<>(0.,-half_upp_size,base2base_height),funnel,radius_g);
 	funnel->GetCollisionModel()->BuildModel();
 	
 	//----------------
 	// Create the Funnel Movement: this should be a constant velocity trajectory in z direction
 	// 
-
+			// Linear actuator btw the container and the funnel, it simulates the raising of the latter which must be always closely over the sand heap top.
+	auto cont2fun = std::make_shared<ChLinkLockPrismatic>();
+	cont2fun->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
+	system->AddLink(cont2fun);
 	auto container2funnel = std::make_shared<ChLinkLinActuator>();
-	container2funnel->Initialize(funnel,container,false,ChCoordsys<>(funnel->GetPos(),QUNIT),ChCoordsys<>(container->GetPos(),QUNIT));
+	container2funnel->Initialize(funnel,container,false,ChCoordsys<>(funnel->GetPos(), QUNIT),ChCoordsys<>(container->GetPos(), QUNIT));
 	auto funnel_law = std::make_shared<ChFunction_Ramp>();
-	funnel_law->Set_ang(100.*radius_g);// velocity of the funnel(10X test for simulation purposes).
+	funnel_law->Set_ang(1.5*radius_g);// velocity of the funnel(10X test for simulation purposes).
 	container2funnel->Set_lin_offset(Vlength(container->GetPos()-funnel->GetPos()));
 	container2funnel->Set_dist_funct(funnel_law);
 	system->AddLink(container2funnel);
@@ -362,21 +384,26 @@ int main(int argc, char** argv) {
 
 	// Create a particle generator and a mixture entirely made out of spheres
 	utils::Generator gen(system);
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::SPHERE, 1);//BIsphere
+	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::SPHERE, 1.);//BIsphere
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
 	m1->setDefaultSize(radius_g);
 	gen.setBodyIdentifier(Id_g);
+	//std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::BISPHERE, .0);//BIsphere
+	//m2->setDefaultMaterial(material_terrain);
+	//m2->setDefaultDensity(rho_g);
+	//m2->setDefaultSize(radius_g);
+	//gen.setBodyIdentifier(100*Id_g);
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(20* r - r, 20*r - r, 0);
+	ChVector<> hdims(10* r - r, 10*r - r, 0);
 	ChVector<> center(0., 0., 11*r);//10r is the height of the funnel.
 	
 	// IN FUNNEL TEST THIS CONSTRUCTION IS NOT USEFUL, WE GENERATE RUNTIME A LAYER AFTER ANOTHER
 	// // ACCORDING THE TIME
 	// for (int il = 0; il < num_layers; il++) {
-		// gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
+																					gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
 		// center.z += 2 * r;
 		// // shrink uniformly the upper layer
 		// hdims.x -= 2 * r;
@@ -427,7 +454,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 5.00;
+	double time_end = 10.00;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
@@ -446,19 +473,16 @@ int main(int argc, char** argv) {
 	int out_frame = 0;
 	int next_out_frame = 0;
 	
-	double funcont =1.;
+	double funnel_count = 1.;
 
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
-		
-		// Change the if control--It doen't work as I mean
-		if ((cum_sim_time / .025 - funcont)< (time_step/10)){
-			// It doesn't enter here UP
-		auto funpos = ChVector<>(funnel->GetPos());
-		// It does not work at all UP
-		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funpos + ChVector<>(0.,0.,11*r), hdims);
-		funcont += 1.;
-			if(funcont == 78.){funcont = 0.;}
+
+		double test=system->GetChTime() / 0.25 - funnel_count;
+
+		if (std::abs(test) < time_step) {
+			gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+			funnel_count += 1.;
 		}
 
 		//TimingOutput(system);
