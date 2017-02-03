@@ -1,4 +1,4 @@
-#include <iostream>//Add
+#include <iostream>
 
 #include "chrono/core/ChRealtimeStep.h"
 #include "chrono/physics/ChSystem.h"
@@ -6,8 +6,6 @@
 #include "chrono/physics/ChLinkLinActuator.h"
 #include "chrono/assets/ChTexture.h"
 #include "chrono/assets/ChPointPointDrawing.h"
-#include "chrono_irrlicht/ChBodySceneNodeTools.h"
-#include "chrono_irrlicht/ChIrrApp.h"
 
 #include "chrono/utils/ChUtilsGenerators.h"
 
@@ -15,30 +13,12 @@
 #include <vector>
 #include <cmath>
 
-#include <irrlicht.h>
 
 #include "chrono_opengl/ChOpenGLWindow.h"
 #include "chrono_parallel/physics/ChSystemParallel.h"
-//#include <vld.h>
-
-//////#define _CRTDBG_MAP_ALLOC
-//////#include <stdlib.h>
-//////#include <crtdbg.h>
-//////#ifdef _DEBUG
-//////#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
-//////#define new DEBUG_NEW
-//////#endif
-//#ifdef _DEBUG
-//#define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
-//// Replace _NORMAL_BLOCK with _CLIENT_BLOCK if you want the
-//// allocations to be of _CLIENT_BLOCK type
-//#else
-//#define DBG_NEW new
-//#endif
-
 using namespace chrono;
 using namespace chrono::collision;
-//#define USE_PENALTY
+#define USE_PENALTY
 enum BucketSide { LEFT, RIGHT };
 struct Points {
 	Points() {}
@@ -61,69 +41,6 @@ void ReadFile(const std::string& filename, std::vector<Points>& profile) {
 	ifile.close();
 
 
-
-}
-void AddBucketMesh(std::vector<Points> p_ext, std::vector<Points> p_int, std::shared_ptr<ChBody> bucket) {
-	// it's missing check for profile equal sizes
-
-	for (int iter = 0; iter < p_ext.size() - 1; iter++) {
-		// trimesh Usage
-		geometry::ChTriangleMeshConnected m_trimesh;
-		// readability Aliases
-		std::vector<ChVector<> >& vertices = m_trimesh.getCoordsVertices();
-		std::vector<ChVector<> >& normals = m_trimesh.getCoordsNormals();
-		std::vector<ChVector<int> >& idx_vertices = m_trimesh.getIndicesVertexes();
-		std::vector<ChVector<int> >& idx_normals = m_trimesh.getIndicesNormals();
-		// problem size
-		int n_verts = 8;
-		int n_faces = 12;
-		// Resize mesh arrays.
-		m_trimesh.getCoordsVertices().resize(n_verts);
-		m_trimesh.getCoordsNormals().resize(n_verts);
-		m_trimesh.getCoordsUV().resize(n_verts);
-		m_trimesh.getCoordsColors().resize(n_verts);
-		m_trimesh.getIndicesVertexes().resize(n_faces);
-		m_trimesh.getIndicesNormals().resize(n_faces);
-		// Load mesh vertices.
-		std::cout << "Load vertices.." << std::endl;
-		float hy = .5;
-		m_trimesh.getCoordsVertices()[0] = ChVector<>(p_int[iter].mx, -hy / 2, p_int[iter].mz);
-		m_trimesh.getCoordsVertices()[3] = ChVector<>(p_int[iter + 1].mx, -hy / 2, p_int[iter + 1].mz);
-		m_trimesh.getCoordsVertices()[2] = ChVector<>(p_ext[iter + 1].mx, -hy / 2, p_ext[iter + 1].mz);
-		m_trimesh.getCoordsVertices()[1] = ChVector<>(p_ext[iter].mx, -hy / 2, p_ext[iter].mz);
-
-		m_trimesh.getCoordsVertices()[4] = ChVector<>(p_int[iter].mx, +hy / 2, p_int[iter].mz);
-		m_trimesh.getCoordsVertices()[7] = ChVector<>(p_int[iter + 1].mx, +hy / 2, p_int[iter + 1].mz);
-		m_trimesh.getCoordsVertices()[6] = ChVector<>(p_ext[iter + 1].mx, +hy / 2, p_ext[iter + 1].mz);
-		m_trimesh.getCoordsVertices()[5] = ChVector<>(p_ext[iter].mx, +hy / 2, p_ext[iter].mz);
-
-		// Load mesh faces
-		// Specify the face vertices counter-clockwise.
-		// Set the normal indices same as the vertex indices.
-		std::cout << "Load faces..." << std::endl;
-		idx_vertices[0] = ChVector<int>(0, 1, 3);
-		idx_vertices[1] = ChVector<int>(1, 2, 3);
-		idx_vertices[2] = ChVector<int>(4, 7, 5);
-		idx_vertices[3] = ChVector<int>(7, 6, 5);
-
-		idx_vertices[4] = ChVector<int>(0, 3, 4);
-		idx_vertices[5] = ChVector<int>(3, 7, 4);
-		idx_vertices[6] = ChVector<int>(1, 5, 2);
-		idx_vertices[7] = ChVector<int>(2, 5, 6);
-
-		idx_vertices[8] = ChVector<int>(3, 6, 7);
-		idx_vertices[9] = ChVector<int>(3, 2, 6);
-		idx_vertices[10] = ChVector<int>(0, 4, 5);
-		idx_vertices[11] = ChVector<int>(0, 5, 1);
-
-		auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
-		trimesh_shape->SetMesh(m_trimesh);
-		trimesh_shape->SetName("triangular_mesh");
-		bucket->AddAsset(trimesh_shape);
-
-
-		bucket->GetCollisionModel()->AddTriangleMesh(m_trimesh, true, false, ChVector<>(0, 0, 0));
-	}
 
 }
 void AddBucketHull(std::vector<Points> p_ext, std::vector<Points> p_int, std::shared_ptr<ChBody> bucket) {
@@ -198,64 +115,11 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 		//bucket->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 	}
 }
-void AddMeshWall(std::shared_ptr<ChBody> body, const ChVector<>& dim, const ChVector<>& loc) {
-	geometry::ChTriangleMeshConnected trimesh;
-
-	std::vector<ChVector<> >& vertices = trimesh.getCoordsVertices();
-	std::vector<ChVector<> >& normals = trimesh.getCoordsNormals();
-	std::vector<ChVector<int> >& idx_vertices = trimesh.getIndicesVertexes();
-	std::vector<ChVector<int> >& idx_normals = trimesh.getIndicesNormals();
-
-	int num_vert = 8;
-	int num_faces = 8;
-
-	vertices.resize(num_vert);
-	normals.resize(num_vert);
-	trimesh.getCoordsUV().resize(num_vert);
-	trimesh.getCoordsColors().resize(num_vert);
-
-	idx_vertices.resize(num_faces);
-	idx_normals.resize(num_faces);
-
-	vertices[0] = ChVector<>(-dim.x, -dim.y, -dim.z);
-	vertices[1] = ChVector<>(-dim.x, +dim.y, -dim.z);
-	vertices[2] = ChVector<>(+dim.x, +dim.y, -dim.z);
-	vertices[3] = ChVector<>(+dim.x, -dim.y, -dim.z);
-
-	vertices[4] = ChVector<>(-dim.x, -dim.y, +dim.z);
-	vertices[5] = ChVector<>(-dim.x, +dim.y, +dim.z);
-	vertices[6] = ChVector<>(+dim.x, +dim.y, +dim.z);
-	vertices[7] = ChVector<>(+dim.x, -dim.y, +dim.z);
-
-	idx_vertices[0] = ChVector<int>(0, 1, 3);
-	idx_vertices[1] = ChVector<int>(1, 2, 3);
-	idx_vertices[2] = ChVector<int>(4, 7, 5);
-	idx_vertices[3] = ChVector<int>(7, 6, 5);
-
-	idx_vertices[4] = ChVector<int>(0, 3, 4);
-	idx_vertices[5] = ChVector<int>(3, 7, 4);
-	idx_vertices[6] = ChVector<int>(1, 5, 2);
-	idx_vertices[7] = ChVector<int>(2, 5, 6);
-
-	//idx_vertices[8] = ChVector<int>(3, 6, 7);
-	//idx_vertices[9] = ChVector<int>(3, 2, 6);
-	//idx_vertices[10] = ChVector<int>(0, 4, 5);
-	//idx_vertices[11] = ChVector<int>(0, 5, 1);
-
-	body->GetCollisionModel()->AddTriangleMesh(trimesh, true, true, loc);
-
-	auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
-	trimesh_shape->SetMesh(trimesh);
-	trimesh_shape->SetName("my_mesh");
-	body->AddAsset(trimesh_shape);
-}
 
 int main(int argc, char* argv[]) {
-	//_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-
 	std::vector<Points> p_ext;
 	std::vector<Points> p_int;
-	const std::string out_dir = "../";//Directory di Lavoro settata in $(OutDir)!!!
+	const std::string out_dir = "../";
 	const std::string& ext_profile = out_dir + "data/ext_profile.txt";
 	const std::string& int_profile = out_dir + "data/int_profile.txt";
 	ReadFile(ext_profile, p_ext);
@@ -272,36 +136,25 @@ int main(int argc, char* argv[]) {
 	materialDEM->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
 
 	// 0. Set the path to the Chrono data folder
-	//SetChronoDataPath(CHRONO_DATA_DIR);
+	SetChronoDataPath(CHRONO_DATA_DIR);
 
 	// 1. Create the system
 #ifdef USE_PENALTY
+	//ChSystemParallelDEM* system = new ChSystemParallelDEM;
 	ChSystemParallelDEM system;
+	//ChMaterialSurfaceBase::ContactMethod contact_method = ChMaterialSurfaceBase::DEM;
    #else
 	ChSystemParallelDVI system;
 #endif
 
-	//_CrtSetBreakAlloc(173);
 	system.Set_G_acc(ChVector<>(.0,.0,.0));
 	// GROUND
-	/*_CrtMemState s1;
-	_CrtMemState s2;
-	_CrtMemState s3;
-	_CrtMemCheckpoint(&s1);
-	*/
 	auto ground = std::shared_ptr<ChBody>(system.NewBody());
-//	std::shared_ptr<ChBody> ground(system.NewBody());
-//	_CrtMemCheckpoint(&s2);
-//
-//	if (_CrtMemDifference(&s3,&s1, &s2))
-//		_CrtMemDumpStatistics(&s3);
-////	_CrtDumpMemoryLeaks();
-//
+	//std::shared_ptr<ChBody> ground(system.NewBody());
 	system.Add(ground);
 	ground->SetBodyFixed(true);
 	ground->SetIdentifier(-1);
 	ground->SetName("ground");
-	//ground->SetPos(ChVector<>(0.0, 0., 0.0));
 	
     
 	/// .16 initial from chassis offset, .21 initial max height, .33 initial width
@@ -333,16 +186,18 @@ int main(int argc, char* argv[]) {
 	// 2 Create the rigid bodies
 
 		// LIFT
-		auto lift = std::shared_ptr<ChBody>(system.NewBody());
+		auto lift = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());//switched to ChBodyAuxRef
+//		auto lift = std::make_shared<ChBody>(contact_method);
 		system.Add(lift);
 		lift->SetBodyFixed(false);
 		lift->SetName("lift arm");
-		lift->SetPos(COG_lift);// trouble in debug nor in release
-		ChVector<> u1 = (COG_lift - POS_ch2lift).GetNormalized();//Normalize,not GetNormalize
+		lift->SetPos(POS_ch2lift);// COG_lift changed
+		ChVector<> u1 = (POS_lift2bucket - POS_ch2lift).GetNormalized();//Normalize,not GetNormalize
 		ChVector<> w1 = Vcross(u1, VECT_Y).GetNormalized();//overkill
 		ChMatrix33<> rot1;//no control on orthogonality
 		rot1.Set_A_axis(u1, VECT_Y, w1);
 		lift->SetRot(rot1);
+		lift->SetFrame_COG_to_REF(ChFrame<>(lift->GetFrame_REF_to_abs().GetInverse() * COG_lift, QUNIT));//switched to ChBodyAuxRef
 		lift->SetMass(993.5);
 		lift->SetInertiaXX(ChVector<>(110.2, 1986.1, 1919.3));
 		lift->SetInertiaXY(ChVector<>(0.,0.,339.6));
@@ -376,19 +231,21 @@ int main(int argc, char* argv[]) {
 				lift_mesh.LoadWavefrontMesh(out_dir + "data/boom_mod.obj", false, false);
 				auto lift_mesh_shape = std::make_shared<ChTriangleMeshShape>();
 				lift_mesh_shape->SetMesh(lift_mesh);
+				lift_mesh_shape->SetName("boom");
 				lift->AddAsset(lift_mesh_shape);
 
 		// ROD
-		auto rod = std::shared_ptr<ChBody>(system.NewBody());
+		auto rod = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());
 		system.Add(rod);
 		rod->SetName("rod arm");
 		rod->SetIdentifier(3);
-		rod->SetPos(COG_rod);
+		rod->SetPos(POS_lift2rod);//COG_rod
 		ChVector<> u3 = (POS_rod2link - POS_lift2rod).GetNormalized();
 		ChVector<> w3 = Vcross(u3, VECT_Y).GetNormalized();//overkill
 		ChMatrix33<> rot3;
 		rot3.Set_A_axis(u3, VECT_Y, w3);
 		rod->SetRot(rot3);
+		rod->SetFrame_COG_to_REF(ChFrame<>(rod->GetFrame_REF_to_abs().GetInverse() * COG_rod, QUNIT));//switched to ChBodyAuxRef
 		rod->SetMass(381.5);
 		rod->SetInertiaXX(ChVector<>(11.7, 33.4, 29.5));
 		rod->SetInertiaXY(ChVector<>(0., 0., -12.1));
@@ -402,11 +259,18 @@ int main(int argc, char* argv[]) {
 						rod_asset1->GetCylinderGeometry().rad = .025;
 						rod_asset1->GetCylinderGeometry().p1 = rod->GetFrame_COG_to_abs().GetInverse() * POS_lift2rod;
 						rod_asset1->GetCylinderGeometry().p2 = rod->GetFrame_COG_to_abs().GetInverse() * POS_rod2link;
-						rod->AddAsset(rod_asset);
-						rod->AddAsset(rod_asset1);
+						//rod->AddAsset(rod_asset);
+						//rod->AddAsset(rod_asset1);
 						auto col_r = std::make_shared<ChColorAsset>();
 						col_r->SetColor(ChColor(0.0f, 0.0f, 0.2f));
-						rod->AddAsset(col_r);
+						//rod->AddAsset(col_r);
+					geometry::ChTriangleMeshConnected rocker_mesh;
+					rocker_mesh.LoadWavefrontMesh(out_dir + "data/rockerarm_mod.obj", false, false);
+					auto rocker_mesh_shape = std::make_shared<ChTriangleMeshShape>();
+					rocker_mesh_shape->SetMesh(rocker_mesh);
+					rocker_mesh_shape->SetName("boom");
+					rod->AddAsset(rocker_mesh_shape);
+
 		// LINK
 		auto link = std::shared_ptr<ChBody>(system.NewBody());
 		system.Add(link);
@@ -457,6 +321,7 @@ int main(int argc, char* argv[]) {
 		bucket_mesh.LoadWavefrontMesh(out_dir + "data/bucket_mod.obj", false, false);
 		auto bucket_mesh_shape = std::make_shared<ChTriangleMeshShape>();
 		bucket_mesh_shape->SetMesh(bucket_mesh);
+		bucket_mesh_shape->SetName("bucket");
 		bucket->AddAsset(bucket_mesh_shape);
 
 		// CHASSIS
@@ -479,16 +344,7 @@ int main(int argc, char* argv[]) {
 						chassis->AddAsset(chassis_asset);
 
 
-
-
-
-
 // 3. Add joint constraints
-			// LIFT-ROD  up revjoint-->IT's NOT A REV JOINT!! I keep it as a reminder.
-						//auto rev_lift2lever = std::make_shared<ChLinkLockRevolute>();
-						//rev_lift2lever->SetName("revolute_lift2lever");
-						//rev_lift2lever->Initialize(rod, lift, ChCoordsys<>(POS_lift2lever, z2y >>rot3.Get_A_quaternion() ));
-						//system.AddLink(rev_lift2lever);
 			// LIFT-ROD spring(it simulates the actuator)
 						auto springdamper_ground_ball = std::make_shared<ChLinkSpring>();
 						springdamper_ground_ball->Initialize(rod,lift,false,POS_lift2lever,PIS_lift2lever,true,.00);
@@ -527,7 +383,7 @@ int main(int argc, char* argv[]) {
 						// end test_law
 						lin_lift2rod->Set_dist_funct(tilt_law_test);
 
-						//system.AddLink(springdamper_ground_ball);
+						//system->AddLink(springdamper_ground_ball);
 						system.Add(lin_lift2rod);
 			// LIFT-ROD inthe middle revjoint
 						auto rev_lift2rod = std::make_shared<ChLinkLockRevolute>();
