@@ -17,6 +17,9 @@
 #include <string>
 #include <valarray>
 #include <vector>
+#include <numeric>
+#include <functional>
+#include <algorithm>
 
 #include "chrono/ChConfig.h"
 #include "chrono/core/ChFileutils.h"
@@ -71,6 +74,7 @@ void TimingOutput(chrono::ChSystem* mSys) {
 bool povray_output = false;
 const std::string out_dir = "../";
 const std::string pov_dir = out_dir + "/POVRAY";
+const std::string flatten = out_dir + "/flatten_track";
 int out_fps = 60;
 
 using std::cout;
@@ -83,6 +87,7 @@ int main(int argc, char** argv) {
 	bool use_mat_properties = true;
 	bool render = true;
 	bool track_granule = false;
+	bool track_flatten = true;
 
 	// --------------------------
 	// Create output directories.
@@ -98,6 +103,14 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 	}
+
+	if (track_flatten) {
+			if (ChFileutils::MakeDirectory(flatten.c_str()) < 0) {
+				cout << "Error creating directory " << flatten << endl;
+				return 1;
+			}
+		}
+
 
 
 
@@ -125,7 +138,10 @@ int main(int argc, char** argv) {
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 15;// ceil(H/radius_g)=
+	// PAY ATTENTION TO THIS VALUE: IT STACKS THE SIMULATION IF YOU USE UNFEASIBLE ONE.
+	// e.g., 1 single sphere layer is achieved with num_layers=10 and you set num_layers=12;
+	// look at the for loop generation for more details.
+	int num_layers = 24;// ceil(H/radius_g)=30
 
 	// Terrain contact properties
 	float friction_terrain = 0.9f;// (H,W) requires mi=.75; giving a higher coeff, the pile SHOULD settle faster
@@ -247,37 +263,68 @@ int main(int argc, char** argv) {
 
 	container->GetCollisionModel()->ClearModel();
 	// Bottom box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -2*hthick),
 		ChQuaternion<>(1, 0, 0, 0), true);
-	// Front box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Rear box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Left box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Right box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	container->GetCollisionModel()->BuildModel();
+	////// Front box
+	////utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	////	ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	////// Rear box
+	////utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	////	ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	////// Left box
+	////utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	////	ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	////// Right box
+	////utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	////	ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//////container->GetCollisionModel()->BuildModel();
+	////
 
+	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
+	double spacing = 3.5 * radius_g;
+
+	for (int ix = -40; ix < 40; ix++) {
+		for (int iy = -40; iy < 40; iy++) {
+			ChVector<> pos(ix * spacing, iy * spacing, -2.5*radius_g);
+			utils::AddSphereGeometry(container.get(), 2.5*radius_g, pos);
+		}
+	}
+	container->GetCollisionModel()->BuildModel();
+			
 	// ----------------
 	// Create particles
 	// ----------------
 
-	// Create a particle generator and a mixture entirely made out of spheres
+	// Create a particle generator and a mixture entirely made out of bispheres
 	utils::Generator gen(system);
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, 1);//BISPHERE
+	gen.setBodyIdentifier(Id_g);
+	// SPHERES
+	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, 0.0);
+	m0->setDefaultMaterial(material_terrain);
+	m0->setDefaultDensity(rho_g);
+	m0->setDefaultSize(radius_g);
+	// BISPHERES
+	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, 0.8);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
 	m1->setDefaultSize(radius_g);
-	gen.setBodyIdentifier(Id_g);
+	// Add new types of shapes to the generator, giving the percentage of each one
+		//ELLIPSOIDS
+	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, .2);
+	m2->setDefaultMaterial(material_terrain);
+	m2->setDefaultDensity(rho_g);
+	m2->setDefaultSize(radius_g/2);
+	// Add new types of shapes to the generator, giving the percentage of each one
+	//CONES/
+	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, .0);
+	m3->setDefaultMaterial(material_terrain);
+	m3->setDefaultDensity(rho_g);
+	m3->setDefaultSize(radius_g/5);
+
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(.795/2 - r, .795/2 - r, 0);//W=.795
+	ChVector<> hdims(hdimX/2 - r, hdimY/2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
 	ChVector<> center(0, 0, 2 * r);
 
 	for (int il = 0; il < num_layers; il++) {
@@ -287,12 +334,74 @@ int main(int argc, char** argv) {
 		hdims.x -= 2 * r;
 		hdims.y -= 2 * r;
 		// move the center abscissa by a 1*r(DISABLED FOR THE MOMENT) 
-		//center.x += r * pow(-1, il);
+		center.x += r * pow(-1, il);
 
 	}
 
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
+
+//			//-------------------------Checking Repose Angle----------------------------//--------------------->>>>>>>>IT THROWS AN EXCEPTION ON system->Getbodylist->ClearForceVariables
+
+			std::vector<std::shared_ptr<ChBody>> particlelist;
+			auto original_bodylist  = system->Get_bodylist();
+			//for (int i = 0; i < original_bodylist->size(); i++) { auto mbody = std::shared_ptr<ChBody>(original_bodylist[original_bodylist.begin()+i]);
+			//															particlelist.push_back(mbody);			}
+			for (auto body = original_bodylist->begin(); body != original_bodylist->end(); ++body) {
+							auto mbody = std::shared_ptr<ChBody>(*body);
+							particlelist.push_back(mbody);
+							}
+			particlelist.erase(particlelist.begin());// BECAUSE I KNOW 1st element is the container-->Note: for huge number of particles, 1 single element affects poorly the statistics
+			std::vector<double> rs;
+			std::vector<double> zs;
+			double mean_rs;
+			double dev_rs;
+			for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+				double r = sqrt(pow((*body)->GetPos().x, 2) + pow((*body)->GetPos().y, 2));
+				rs.push_back(r);
+				double z = (*body)->GetPos().z;
+				zs.push_back(z);				
+			}
+			// Computation of sum,mean and sumofsquares,stdev
+			double sum = std::accumulate(rs.begin(), rs.end(), 0.0);
+			double m = sum / rs.size();
+
+			double accum = 0.0;
+			std::for_each(rs.begin(), rs.end(), [&](const double d) {
+				accum += (d - m) * (d - m);
+			});
+
+			double stdev = sqrt(accum / (rs.size() - 1));
+			// Outliers detecting WIP
+			std::vector<size_t> outliers;
+			auto lambda = [&m,&stdev](int& i, double m, double stdev) {return i > m + 2 * stdev; };
+			auto it = std::find_if(rs.begin(), rs.end(), [&](int i) {return i > m + 2 * stdev; });
+			while (it != rs.end()) {
+				outliers.emplace_back(std::distance(rs.begin(), it));
+				it = std::find_if(std::next(it), rs.end(), [](int i) {return i > 5; });
+			}
+			// Deleting outliers
+			int jcounter = 0;
+			for (int i = 0; i < outliers.size(); i++) {
+				rs.erase(rs.begin()+outliers[i]-jcounter);
+				zs.erase(zs.begin() + outliers[i] - jcounter);
+				jcounter++;
+			}
+			// Calculate the repose angle.
+			auto maxr = rs[0];
+			auto maxz = zs[0];
+						// check both sizes are equal
+			for (int i = 1; i < rs.size(); i++) {
+				if (rs[i] > maxr)
+					maxr = rs[i];
+				if (zs[i] > maxz)
+					maxz = zs[i];
+			}
+
+			////-------------------------------------------------------------------------//
+			//GetLog() << maxr << "\n";
+			////-------------------------------------------------------------------------//
+	
 
 	// If tracking a granule (roughly in the "middle of the pack"),
 	// grab a pointer to the tracked body and open an output file.
@@ -314,6 +423,7 @@ int main(int argc, char** argv) {
 		outf << std::scientific;
 	}
 
+
 #ifdef CHRONO_OPENGL
 	// -------------------------------
 	// Create the visualization window
@@ -331,7 +441,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 5.00;
+	double time_end = 100.00;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
@@ -349,9 +459,33 @@ int main(int argc, char** argv) {
 	int sim_frame = 0;
 	int out_frame = 0;
 	int next_out_frame = 0;
+	const std::string flatten_track = "flatten_track";
 
 	while (system->GetChTime() < time_end) {
+
+
+// Write a file each 60 time_steps(tunable) to 
+		//if (track_flatten) {
+			if (sim_frame == next_out_frame) {
+				std::ofstream outs;             // output file stream
+				char filename[100];
+				sprintf(filename, "../%s/data_%03d.dat", flatten_track.c_str(), out_frame + 1);
+				outs.open(filename, std::ios::out);
+				outs.precision(7);
+				outs << std::scientific;
+				for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+					double x = (*body)->GetPos().x; double y = (*body)->GetPos().y; double z = (*body)->GetPos().z;
+					// no matter if one of the bodies is the terrain-Its erasing will be done offline
+					outs << x << "\t" << y << "\t" << z << endl;
+				}
+				outs.close();
+				out_frame++;
+				next_out_frame += out_steps;
+			}
+		//}
+
 		system->DoStepDynamics(time_step);
+		sim_frame++;
 
 		//TimingOutput(system);
 
@@ -366,7 +500,7 @@ int main(int argc, char** argv) {
 			assert(granule);
 			const ChVector<>& pos = granule->GetPos();
 			const ChVector<>& vel = granule->GetPos_dt();
-			outf << system->GetChTime() << " ";
+			outf << system->GetChTime() << " ";  
 			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
 			outf << pos.x << " " << pos.y << " " << pos.z << " ";
 			outf << vel.x << " " << vel.y << " " << vel.z;
