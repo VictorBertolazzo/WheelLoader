@@ -63,7 +63,7 @@ void TimingOutput(chrono::ChSystem* mSys) {
 	int BODS = mSys->GetNbodies();
 	int CNTC = mSys->GetNcontacts();
 	if (chrono::ChSystemParallel* parallel_sys = dynamic_cast<chrono::ChSystemParallel*>(mSys)) {
-		REQ_ITS = ((chrono::ChIterativeSolverParallel*)(mSys->GetSolverSpeed()))->GetTotalIterations();
+		REQ_ITS = std::static_pointer_cast<chrono::ChIterativeSolverParallel>(mSys->GetSolver())->GetTotalIterations();
 	}
 
 	printf("   %8.5f | %7.4f | %7.4f | %7.4f | %7.4f | %7.4f | %7d | %7d | %7d | %7.4f |\n", TIME, STEP, BROD, NARR,
@@ -74,7 +74,9 @@ void TimingOutput(chrono::ChSystem* mSys) {
 bool povray_output = false;
 const std::string out_dir = "../";
 const std::string pov_dir = out_dir + "/POVRAY";
-const std::string flatten = out_dir + "/flatten_track";
+const std::string flatten = out_dir + "/flatten_track_B4";
+const std::string flatten_track = "flatten_track_B4";
+
 int out_fps = 60;
 
 using std::cout;
@@ -85,9 +87,33 @@ int main(int argc, char** argv) {
 	int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
 	bool use_mat_properties = true;
-	bool render = true;
+	bool render = false;
 	bool track_granule = false;
 	bool track_flatten = true;
+	double radius_g = 0.01;
+
+	// -------------------------
+	// Bumby Terrain
+	// Ra def := Ra_r/Ra_d;
+	// Codec :  A=.5/1.5
+	//			B=1.5/2.5
+	//			C=2.5/3.5
+	//			D=3.5/4.5
+	// -------------------------
+	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
+	double Ra_r = 1.5*radius_g;//Default Size of particles.
+
+
+	// -------------------------
+	// Aliquotes
+	// -------------------------
+	double quote_sp = 0.0;//1
+	double quote_bs = 0.0;//2
+	double quote_el = 0.0;//3
+	double quote_cs = 1.0;//4
+	double quote_bx = 0.0;//5
+	double quote_rc = 0.0;//6
+
 
 	// --------------------------
 	// Create output directories.
@@ -132,7 +158,6 @@ int main(int argc, char** argv) {
 	double hthick = 0.25;
 
 	// Granular material properties
-	double radius_g = 0.01;
 	int Id_g = 10000;
 	double rho_g = 2500;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
@@ -185,14 +210,14 @@ int main(int argc, char** argv) {
 	}
 	case ChMaterialSurfaceBase::DVI: {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
-		sys->GetSettings()->solver.solver_mode = SLIDING;
+		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 0;
 		sys->GetSettings()->solver.max_iteration_sliding = 200;
 		sys->GetSettings()->solver.max_iteration_spinning = 0;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = -1;
 		sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
-		sys->ChangeSolverType(APGD);
+		sys->ChangeSolverType(SolverType::APGD);
 		system = sys;
 
 		break;
@@ -204,7 +229,7 @@ int main(int argc, char** argv) {
 	system->GetSettings()->solver.use_full_inertia_tensor = false;
 	system->GetSettings()->solver.tolerance = 0.1;
 	system->GetSettings()->solver.max_iteration_bilateral = 100;
-	system->GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
+	system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
 	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ);
 
 	// Set number of threads
@@ -281,12 +306,12 @@ int main(int argc, char** argv) {
 	////
 
 	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
-	double spacing = 3.5 * radius_g;
+//	double spacing = 3.5 * radius_g;
 
 	for (int ix = -40; ix < 40; ix++) {
 		for (int iy = -40; iy < 40; iy++) {
-			ChVector<> pos(ix * spacing, iy * spacing, -2.5*radius_g);
-			utils::AddSphereGeometry(container.get(), 2.5*radius_g, pos);
+			ChVector<> pos(ix * Ra_d, iy * Ra_d, -Ra_r);
+			utils::AddSphereGeometry(container.get(), Ra_r, pos);
 		}
 	}
 	container->GetCollisionModel()->BuildModel();
@@ -299,27 +324,37 @@ int main(int argc, char** argv) {
 	utils::Generator gen(system);
 	gen.setBodyIdentifier(Id_g);
 	// SPHERES
-	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, 0.0);
+	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, quote_sp);
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(rho_g);
 	m0->setDefaultSize(radius_g);
 	// BISPHERES
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, 0.8);
+	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
 	m1->setDefaultSize(radius_g);
 	// Add new types of shapes to the generator, giving the percentage of each one
 		//ELLIPSOIDS
-	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, .2);
+	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
 	m2->setDefaultMaterial(material_terrain);
 	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(radius_g/2);
+	m2->setDefaultSize(radius_g);
 	// Add new types of shapes to the generator, giving the percentage of each one
-	//CONES/
-	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, .0);
+	//CAPSULES/
+	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
 	m3->setDefaultMaterial(material_terrain);
 	m3->setDefaultDensity(rho_g);
-	m3->setDefaultSize(radius_g/5);
+	m3->setDefaultSize(radius_g);
+	//BOXES/
+	std::shared_ptr<utils::MixtureIngredient> m4 = gen.AddMixtureIngredient(utils::BOX, quote_bx);
+	m4->setDefaultMaterial(material_terrain);
+	m4->setDefaultDensity(rho_g);
+	m4->setDefaultSize(radius_g);
+	//ROUNDED-CYLINDERS/
+	std::shared_ptr<utils::MixtureIngredient> m5 = gen.AddMixtureIngredient(utils::ROUNDEDCYLINDER, quote_rc);
+	m5->setDefaultMaterial(material_terrain);
+	m5->setDefaultDensity(rho_g);
+	m5->setDefaultSize(radius_g);
 
 
 	// Create particles in layers until reaching the desired number of particles
@@ -441,7 +476,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 100.00;
+	double time_end = 0.50;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
@@ -459,14 +494,13 @@ int main(int argc, char** argv) {
 	int sim_frame = 0;
 	int out_frame = 0;
 	int next_out_frame = 0;
-	const std::string flatten_track = "flatten_track";
 
 	while (system->GetChTime() < time_end) {
 
 
 // Write a file each 60 time_steps(tunable) to 
-		//if (track_flatten) {
-			if (sim_frame == next_out_frame) {
+		//if (track_flatten) 	
+		if (sim_frame == next_out_frame) {
 				std::ofstream outs;             // output file stream
 				char filename[100];
 				sprintf(filename, "../%s/data_%03d.dat", flatten_track.c_str(), out_frame + 1);
