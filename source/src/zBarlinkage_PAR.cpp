@@ -512,7 +512,7 @@ int main(int argc, char* argv[]) {
 						system.GetSettings()->solver.max_iteration_bilateral = 200;
 						system.GetSettings()->solver.tolerance = tolerance;
 
-						system.GetSettings()->collision.narrowphase_algorithm = NARROWPHASE_HYBRID_MPR;
+						system.GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
 						system.GetSettings()->collision.bins_per_axis = vec3(10, 10, 10);
 
 #else
