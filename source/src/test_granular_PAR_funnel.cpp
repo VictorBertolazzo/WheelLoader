@@ -147,6 +147,24 @@ int main(int argc, char** argv) {
 	bool render = true;
 	bool track_granule = false;
 
+	// -------------------------
+	// Tuning Parameters
+	// -------------------------
+	double radius_g = 0.01;
+
+
+
+	// -------------------------
+	// Aliquotes
+	// -------------------------
+	double quote_sp = 0.00;//1
+	double quote_bs = 0.05;//2
+	double quote_el = 0.05;//3
+	double quote_cs = 0.05;//4
+	double quote_bx = 0.85;//5
+	double quote_rc = 0.00;//6
+
+
 	// --------------------------
 	// Create output directories.
 	// --------------------------
@@ -182,7 +200,6 @@ int main(int argc, char** argv) {
 	double hthick = 0.25;
 
 	// Granular material properties
-	double radius_g = 0.01;
 	int Id_g = 10000;
 	double rho_g = 2500;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
@@ -350,8 +367,8 @@ int main(int argc, char** argv) {
 	funnel->SetCollide(true);
 	funnel->GetCollisionModel()->ClearModel();
 	// OpenGL does not accept more than ONE visualization shape per body
-	double half_low_size = 5.5*radius_g / 2;
-	double half_upp_size = 20 * radius_g / 2;
+	double half_low_size = 6 *radius_g ;
+	double half_upp_size = 20 * radius_g ;
 	double base2base_height = 100 * radius_g;
 	AddWall(ChVector<>(half_low_size,.0,.0),ChVector<>(half_upp_size,.0,base2base_height),funnel,radius_g);
 	AddWall(ChVector<>(0.,half_low_size,.0),ChVector<>(0.,half_upp_size,base2base_height),funnel,radius_g);
@@ -369,7 +386,7 @@ int main(int argc, char** argv) {
 	auto container2funnel = std::make_shared<ChLinkLinActuator>();
 	container2funnel->Initialize(funnel,container,false,ChCoordsys<>(funnel->GetPos(), QUNIT),ChCoordsys<>(container->GetPos(), QUNIT));
 	auto funnel_law = std::make_shared<ChFunction_Ramp>();
-	funnel_law->Set_ang(1.5*radius_g);// velocity of the funnel(10X test for simulation purposes).
+	funnel_law->Set_ang(3.6*radius_g);// velocity of the funnel(10X test for simulation purposes).
 	container2funnel->Set_lin_offset(Vlength(container->GetPos()-funnel->GetPos()));
 	container2funnel->Set_dist_funct(funnel_law);
 	system->AddLink(container2funnel);
@@ -384,41 +401,46 @@ int main(int argc, char** argv) {
 
 	// Create a particle generator and a mixture entirely made out of spheres
 	utils::Generator gen(system);
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::SPHERE, 1.);//BIsphere
+	gen.setBodyIdentifier(Id_g);
+	// SPHERES
+	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, quote_sp);
+	m0->setDefaultMaterial(material_terrain);
+	m0->setDefaultDensity(rho_g);
+	m0->setDefaultSize(radius_g);
+	// BISPHERES
+	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
 	m1->setDefaultSize(radius_g);
-	gen.setBodyIdentifier(Id_g);
-	//std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::BISPHERE, .0);//BIsphere
-	//m2->setDefaultMaterial(material_terrain);
-	//m2->setDefaultDensity(rho_g);
-	//m2->setDefaultSize(radius_g);
-	//gen.setBodyIdentifier(100*Id_g);
+	// Add new types of shapes to the generator, giving the percentage of each one
+	//ELLIPSOIDS
+	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
+	m2->setDefaultMaterial(material_terrain);
+	m2->setDefaultDensity(rho_g);
+	m2->setDefaultSize(radius_g);
+	// Add new types of shapes to the generator, giving the percentage of each one
+	//CAPSULES/
+	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
+	m3->setDefaultMaterial(material_terrain);
+	m3->setDefaultDensity(rho_g);
+	m3->setDefaultSize(radius_g / 2);
+	//BOXES/
+	std::shared_ptr<utils::MixtureIngredient> m4 = gen.AddMixtureIngredient(utils::BOX, quote_bx);
+	m4->setDefaultMaterial(material_terrain);
+	m4->setDefaultDensity(rho_g);
+	m4->setDefaultSize(radius_g);
+	//ROUNDED-CYLINDERS/
+	std::shared_ptr<utils::MixtureIngredient> m5 = gen.AddMixtureIngredient(utils::ROUNDEDCYLINDER, quote_rc);
+	m5->setDefaultMaterial(material_terrain);
+	m5->setDefaultDensity(rho_g);
+	m5->setDefaultSize(radius_g / 2);
 
-	// Create particles in layers until reaching the desired number of particles
+
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(10* r - r, 10*r - r, 0);
 	ChVector<> center(0., 0., 11*r);//10r is the height of the funnel.
-	
-	// IN FUNNEL TEST THIS CONSTRUCTION IS NOT USEFUL, WE GENERATE RUNTIME A LAYER AFTER ANOTHER
-	// // ACCORDING THE TIME
-	// for (int il = 0; il < num_layers; il++) {
-																					gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
-		// center.z += 2 * r;
-		// // shrink uniformly the upper layer
-		// hdims.x -= 2 * r;
-		// hdims.y -= 2 * r;
-		// // move the center abscissa by a 1*r 
-		// center.x += r * pow(-1, il);
-// 
-	// }
-
-	//unsigned int num_particles = gen.getTotalNumBodies();
-	//std::cout << "Generated particles:  " << num_particles << std::endl;
-
-	// If tracking a granule (roughly in the "middle of the pack"),
-	// grab a pointer to the tracked body and open an output file.
-
+							// First bunch of particles created
+							gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, base2base_height/2+1.*r), hdims);
 	std::shared_ptr<ChBody> granule;  // tracked granule
 	std::ofstream outf;             // output file stream
 
@@ -454,7 +476,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 10.00;
+	double time_end = 100.00;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
