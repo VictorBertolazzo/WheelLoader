@@ -74,8 +74,8 @@ void TimingOutput(chrono::ChSystem* mSys) {
 bool povray_output = false;
 const std::string out_dir = "../";
 const std::string pov_dir = out_dir + "/POVRAY";
-const std::string flatten = out_dir + "/flatten_track_test005c1e4";
-const std::string flatten_track = "flatten_track_test005c1e4";
+const std::string flatten = out_dir + "/flatten_track_test006c1e4kn1e4kte3";
+const std::string flatten_track = "flatten_track_test006c1e4kn1e4kte3";
 
 int out_fps = 60;
 
@@ -108,13 +108,13 @@ int main(int argc, char** argv) {
 	// Aliquotes
 	// -------------------------
 	double quote_sp = 0.00;//1
-	double quote_bs = 0.20;//2
-	double quote_el = 0.45;//3
+	double quote_bs = 0.10;//2
+	double quote_el = 0.35;//3
 	double quote_cs = 0.00;//4
 	double quote_bx = 0.40;//5
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = .00;
+	double quote_sbx = .15;
 
 	// --------------------------
 	// Create output directories.
@@ -174,9 +174,9 @@ int main(int argc, char** argv) {
 	float restitution_terrain = 0.0f;
 	float Y_terrain = 8e5f;
 	float nu_terrain = 0.3f;
-	float kn_terrain = 1.0e5f;// 1.0e7f;
+	float kn_terrain = 1.0e4f;// 1.0e7f;
 	float gn_terrain = 1.0e3f;
-	float kt_terrain = 2.86e4f;// 2.86e6f;
+	float kt_terrain = 2.86e3f;// 2.86e6f;
 	float gt_terrain = 1.0e3f;
 	float coh_pressure_terrain = 1e4f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
