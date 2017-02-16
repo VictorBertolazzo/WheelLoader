@@ -74,8 +74,8 @@ void TimingOutput(chrono::ChSystem* mSys) {
 bool povray_output = false;
 const std::string out_dir = "../";
 const std::string pov_dir = out_dir + "/POVRAY";
-const std::string flatten = out_dir + "/flatten_track_B4";
-const std::string flatten_track = "flatten_track_B4";
+const std::string flatten = out_dir + "/flatten_track_test005c1e4";
+const std::string flatten_track = "flatten_track_test005c1e4";
 
 int out_fps = 60;
 
@@ -87,9 +87,9 @@ int main(int argc, char** argv) {
 	int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
 	bool use_mat_properties = true;
-	bool render = false;
+	bool render = true;
 	bool track_granule = false;
-	bool track_flatten = true;
+	bool track_flatten = false;
 	double radius_g = 0.01;
 
 	// -------------------------
@@ -107,13 +107,14 @@ int main(int argc, char** argv) {
 	// -------------------------
 	// Aliquotes
 	// -------------------------
-	double quote_sp = 0.0;//1
-	double quote_bs = 0.0;//2
-	double quote_el = 0.0;//3
-	double quote_cs = 1.0;//4
-	double quote_bx = 0.0;//5
-	double quote_rc = 0.0;//6
+	double quote_sp = 0.00;//1
+	double quote_bs = 0.20;//2
+	double quote_el = 0.45;//3
+	double quote_cs = 0.00;//4
+	double quote_bx = 0.40;//5
+	double quote_rc = 0.00;//6
 
+	double quote_sbx = .00;
 
 	// --------------------------
 	// Create output directories.
@@ -168,16 +169,16 @@ int main(int argc, char** argv) {
 	// look at the for loop generation for more details.
 	int num_layers = 24;// ceil(H/radius_g)=30
 
-	// Terrain contact properties
-	float friction_terrain = 0.9f;// (H,W) requires mi=.75; giving a higher coeff, the pile SHOULD settle faster
+	// Terrain contact properties---Default Ones are commented out.
+	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
 	float restitution_terrain = 0.0f;
 	float Y_terrain = 8e5f;
 	float nu_terrain = 0.3f;
-	float kn_terrain = 1.0e7f;
+	float kn_terrain = 1.0e5f;// 1.0e7f;
 	float gn_terrain = 1.0e3f;
-	float kt_terrain = 2.86e6f;
+	float kt_terrain = 2.86e4f;// 2.86e6f;
 	float gt_terrain = 1.0e3f;
-	float coh_pressure_terrain = 0e3f;
+	float coh_pressure_terrain = 1e4f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
 	// Estimates for number of bins for broad-phase
@@ -355,12 +356,17 @@ int main(int argc, char** argv) {
 	m5->setDefaultMaterial(material_terrain);
 	m5->setDefaultDensity(rho_g);
 	m5->setDefaultSize(radius_g);
+	//BOXES/
+	std::shared_ptr<utils::MixtureIngredient> m6 = gen.AddMixtureIngredient(utils::BOX, quote_sbx);
+	m6->setDefaultMaterial(material_terrain);
+	m6->setDefaultDensity(rho_g);
+	m6->setDefaultSize(radius_g);
 
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(hdimX/2 - r, hdimY/2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, 2 * r);
+	ChVector<> center(0, 0, .5 * r);
 
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
@@ -369,7 +375,7 @@ int main(int argc, char** argv) {
 		hdims.x -= 2 * r;
 		hdims.y -= 2 * r;
 		// move the center abscissa by a 1*r(DISABLED FOR THE MOMENT) 
-		center.x += r * pow(-1, il);
+		center.x += r/2 * pow(-1, il);
 
 	}
 
@@ -476,7 +482,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 0.50;
+	double time_end = 1.50;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
