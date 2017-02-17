@@ -1,4 +1,4 @@
-// Granular Pile creation through layering method.
+// Granular Pile creation dropping down a cylinder-bulky sand shape onto a bumpy terrain.
 // Victor Bertolazzo
 
 // Scaled model of the pile: reduced from a H=3m,W/2=4m(pyramid shape)-->15e6 particles of .01m radius size(for excess rounded, since spheres do not fill the entire space).
@@ -7,9 +7,6 @@
 //																					combining-->W^2*.75W/2/3=Vol-->W=.795 and  H=.298
 // Note: this are qualitative computations that does not take into account shapes,rest coeff and density.(Coulomb-Mohr based approximation of repose angle).
 
-// TODO : Develop clever ways to check the effective repose angle:
-//																	-
-//																	-
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -164,21 +161,17 @@ int main(int argc, char** argv) {
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	// PAY ATTENTION TO THIS VALUE: IT STACKS THE SIMULATION IF YOU USE UNFEASIBLE ONE.
-	// e.g., 1 single sphere layer is achieved with num_layers=10 and you set num_layers=12;
-	// look at the for loop generation for more details.
-	int num_layers = 24;// ceil(H/radius_g)=30
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
 	float restitution_terrain = 0.0f;
 	float Y_terrain = 8e5f;
 	float nu_terrain = 0.3f;
-	float kn_terrain = 1.0e4f;// 1.0e7f;
+	float kn_terrain = 1.0e7f;// 1.0e7f;
 	float gn_terrain = 1.0e3f;
-	float kt_terrain = 2.86e3f;// 2.86e6f;
+	float kt_terrain = 2.86e6f;// 2.86e6f;
 	float gt_terrain = 1.0e3f;
-	float coh_pressure_terrain = 1e4f;// 0e3f;
+	float coh_pressure_terrain = 0e4f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
 	// Estimates for number of bins for broad-phase
@@ -291,20 +284,20 @@ int main(int argc, char** argv) {
 	// Bottom box
 	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -2*hthick),
 		ChQuaternion<>(1, 0, 0, 0), true);
-	////// Front box
-	////utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-	////	ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	////// Rear box
-	////utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-	////	ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	////// Left box
-	////utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-	////	ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	////// Right box
-	////utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-	////	ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	//////container->GetCollisionModel()->BuildModel();
-	////
+	// Front box
+	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+		ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	// Rear box
+	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+		ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	// Left box
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+		ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	// Right box
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+		ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//container->GetCollisionModel()->BuildModel();
+	
 
 	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
 //	double spacing = 3.5 * radius_g;
@@ -339,7 +332,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
 	m2->setDefaultMaterial(material_terrain);
 	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(radius_g);// this need a vector  
+	m2->setDefaultSize(ChVector<>(0.9*radius_g,1.1*radius_g,radius_g/1.2));// this need a vector  
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//CAPSULES/
 	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
@@ -376,18 +369,9 @@ int main(int argc, char** argv) {
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(hdimX/2 - r, hdimY/2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, .5 * r);
+	ChVector<> center(0, 0, 1.50);
 
-	for (int il = 0; il < num_layers; il++) {
-		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
-		center.z += 2 * r;
-		// shrink uniformly the upper layer
-		hdims.x -= 2 * r;
-		hdims.y -= 2 * r;
-		// move the center abscissa by a 1*r(DISABLED FOR THE MOMENT) 
-		center.x += r/2 * pow(-1, il);
-
-	}
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.20, 1.50);
 
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
@@ -449,9 +433,6 @@ int main(int argc, char** argv) {
 					maxz = zs[i];
 			}
 
-			////-------------------------------------------------------------------------//
-			//GetLog() << maxr << "\n";
-			////-------------------------------------------------------------------------//
 	
 
 	// If tracking a granule (roughly in the "middle of the pack"),
@@ -493,7 +474,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 1.50;
-	double time_step = 1e-2;//1e-4;e-
+	double time_step = 1e-3;//1e-4;e-
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
