@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) {
 						lin_lift2rod->SetName("linear_chassis2lift");
 						lin_lift2rod->Initialize(rod, lift, false, ChCoordsys<>(POS_lift2lever, z2x >> rot11.Get_A_quaternion()), ChCoordsys<>(PIS_lift2lever, z2x >> rot11.Get_A_quaternion()));//m2 is the master
 						lin_lift2rod->Set_lin_offset(Vlength(POS_lift2lever - PIS_lift2lever));
-// Sì way
+// Sï¿½ way
 						auto bp_asset = std::make_shared<ChPointPointSegment>();//asset
 						lin_lift2rod->AddAsset(bp_asset);
 //
@@ -554,7 +554,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 
-		_CrtDumpMemoryLeaks();
+		//_CrtDumpMemoryLeaks();
 
     return 0;
 }

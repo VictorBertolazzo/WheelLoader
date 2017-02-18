@@ -1,6 +1,6 @@
 
 SET(MODELS
-  demo_IRR_fel
+#  demo_IRR_fel
   test_granular_PAR
   test_granular_PAR_cyl
   test_granular_PAR_funnel
