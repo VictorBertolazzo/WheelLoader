@@ -9,7 +9,9 @@ SET(MODELS
   test_normal
   test_normal_PAR
   zBarlinkage
-  zBarlinkage_PAR)
+  zBarlinkage_PAR
+  zBarSandpile
+  )
 
 #--------------------------------------------------------------
 # Find the Chrono package with required components

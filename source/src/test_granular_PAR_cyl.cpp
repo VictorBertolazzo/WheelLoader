@@ -108,10 +108,10 @@ int main(int argc, char** argv) {
 	double quote_bs = 0.10;//2
 	double quote_el = 0.35;//3
 	double quote_cs = 0.00;//4
-	double quote_bx = 0.40;//5
+	double quote_bx = 0.55;//5
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = .15;
+	double quote_sbx = .00;
 
 	// --------------------------
 	// Create output directories.
@@ -265,6 +265,9 @@ int main(int argc, char** argv) {
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);
 
+		mat_ter->SetSpinningFriction(0.15*radius_g);
+		mat_ter->SetRollingFriction(0.15*radius_g);
+
 		material_terrain = mat_ter;
 
 		break;
@@ -326,7 +329,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(radius_g);
+	m1->setDefaultSize(radius_g/1.1);
 	// Add new types of shapes to the generator, giving the percentage of each one
 		//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
@@ -368,70 +371,15 @@ int main(int argc, char** argv) {
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(hdimX/2 - r, hdimY/2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
+	ChVector<> hdims(0.20 - r, 0.20 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
 	ChVector<> center(0, 0, 1.50);
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.20, 1.50);
-
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.20, 1.45);
+	//gen.createObjectsBox(utils::POISSON_DISK, 2.0*r, center, hdims);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 
-//			//-------------------------Checking Repose Angle----------------------------//--------------------->>>>>>>>IT THROWS AN EXCEPTION ON system->Getbodylist->ClearForceVariables
 
-			std::vector<std::shared_ptr<ChBody>> particlelist;
-			auto original_bodylist  = system->Get_bodylist();
-			//for (int i = 0; i < original_bodylist->size(); i++) { auto mbody = std::shared_ptr<ChBody>(original_bodylist[original_bodylist.begin()+i]);
-			//															particlelist.push_back(mbody);			}
-			for (auto body = original_bodylist->begin(); body != original_bodylist->end(); ++body) {
-							auto mbody = std::shared_ptr<ChBody>(*body);
-							particlelist.push_back(mbody);
-							}
-			particlelist.erase(particlelist.begin());// BECAUSE I KNOW 1st element is the container-->Note: for huge number of particles, 1 single element affects poorly the statistics
-			std::vector<double> rs;
-			std::vector<double> zs;
-			double mean_rs;
-			double dev_rs;
-			for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
-				double r = sqrt(pow((*body)->GetPos().x, 2) + pow((*body)->GetPos().y, 2));
-				rs.push_back(r);
-				double z = (*body)->GetPos().z;
-				zs.push_back(z);				
-			}
-			// Computation of sum,mean and sumofsquares,stdev
-			double sum = std::accumulate(rs.begin(), rs.end(), 0.0);
-			double m = sum / rs.size();
-
-			double accum = 0.0;
-			std::for_each(rs.begin(), rs.end(), [&](const double d) {
-				accum += (d - m) * (d - m);
-			});
-
-			double stdev = sqrt(accum / (rs.size() - 1));
-			// Outliers detecting WIP
-			std::vector<size_t> outliers;
-			auto lambda = [&m,&stdev](int& i, double m, double stdev) {return i > m + 2 * stdev; };
-			auto it = std::find_if(rs.begin(), rs.end(), [&](int i) {return i > m + 2 * stdev; });
-			while (it != rs.end()) {
-				outliers.emplace_back(std::distance(rs.begin(), it));
-				it = std::find_if(std::next(it), rs.end(), [](int i) {return i > 5; });
-			}
-			// Deleting outliers
-			int jcounter = 0;
-			for (int i = 0; i < outliers.size(); i++) {
-				rs.erase(rs.begin()+outliers[i]-jcounter);
-				zs.erase(zs.begin() + outliers[i] - jcounter);
-				jcounter++;
-			}
-			// Calculate the repose angle.
-			auto maxr = rs[0];
-			auto maxz = zs[0];
-						// check both sizes are equal
-			for (int i = 1; i < rs.size(); i++) {
-				if (rs[i] > maxr)
-					maxr = rs[i];
-				if (zs[i] > maxz)
-					maxz = zs[i];
-			}
 
 	
 
@@ -495,25 +443,6 @@ int main(int argc, char** argv) {
 	while (system->GetChTime() < time_end) {
 
 
-// Write a file each 60 time_steps(tunable) to 
-		//if (track_flatten) 	
-		if (sim_frame == next_out_frame) {
-				std::ofstream outs;             // output file stream
-				char filename[100];
-				sprintf(filename, "../%s/data_%03d.dat", flatten_track.c_str(), out_frame + 1);
-				outs.open(filename, std::ios::out);
-				outs.precision(7);
-				outs << std::scientific;
-				for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
-					double x = (*body)->GetPos().x; double y = (*body)->GetPos().y; double z = (*body)->GetPos().z;
-					// no matter if one of the bodies is the terrain-Its erasing will be done offline
-					outs << x << "\t" << y << "\t" << z << endl;
-				}
-				outs.close();
-				out_frame++;
-				next_out_frame += out_steps;
-			}
-		//}
 
 		system->DoStepDynamics(time_step);
 		sim_frame++;

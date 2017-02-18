@@ -142,7 +142,7 @@ using std::endl;
 
 int main(int argc, char** argv) {
 	int num_threads = 4;
-	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
+	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;
 	bool use_mat_properties = true;
 	bool render = true;
 	bool track_granule = false;
@@ -152,17 +152,27 @@ int main(int argc, char** argv) {
 	// -------------------------
 	double radius_g = 0.01;
 
-
-
+	// -------------------------
+	// Bumby Terrain
+	// Ra def := Ra_r/Ra_d;
+	// Codec :  A=.5/1.5
+	//			B=1.5/2.5
+	//			C=2.5/3.5
+	//			D=3.5/4.5
+	// -------------------------
+	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
+	double Ra_r = 1.5*radius_g;//Default Size of particles.
 	// -------------------------
 	// Aliquotes
 	// -------------------------
 	double quote_sp = 0.00;//1
-	double quote_bs = 0.05;//2
-	double quote_el = 0.05;//3
-	double quote_cs = 0.05;//4
-	double quote_bx = 0.85;//5
+	double quote_bs = 0.15;//2
+	double quote_el = 0.35;//3
+	double quote_cs = 0.00;//4
+	double quote_bx = 0.50;//5
 	double quote_rc = 0.00;//6
+
+	double quote_sbx = .15;
 
 
 	// --------------------------
@@ -392,7 +402,17 @@ int main(int argc, char** argv) {
 	system->AddLink(container2funnel);
 	// test its goodness
 	//--------------------
-	
+	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
+	//	double spacing = 3.5 * radius_g;
+
+	for (int ix = -40; ix < 40; ix++) {
+		for (int iy = -40; iy < 40; iy++) {
+			ChVector<> pos(ix * Ra_d, iy * Ra_d, -Ra_r);
+			utils::AddSphereGeometry(container.get(), Ra_r, pos);
+		}
+	}
+	container->GetCollisionModel()->BuildModel();
+
 	
 
 	// ----------------
@@ -411,13 +431,13 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(radius_g);
+	m1->setDefaultSize(radius_g / 1.1);
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
 	m2->setDefaultMaterial(material_terrain);
 	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(radius_g);
+	m2->setDefaultSize(ChVector<>(0.9*radius_g, 1.1*radius_g, radius_g / 1.2));// this need a vector  
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//CAPSULES/
 	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
@@ -437,10 +457,12 @@ int main(int argc, char** argv) {
 
 
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(10* r - r, 10*r - r, 0);
-	ChVector<> center(0., 0., 11*r);//10r is the height of the funnel.
+	ChVector<> hdims(10* r - r, 10*r - r, 3.0);
+	ChVector<> center(0., 0., 0.0);//10r is the height of the funnel.
 							// First bunch of particles created
-							gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, base2base_height/2+1.*r), hdims);
+							// gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, 3.0), hdims);
+								gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+
 	std::shared_ptr<ChBody> granule;  // tracked granule
 	std::ofstream outf;             // output file stream
 

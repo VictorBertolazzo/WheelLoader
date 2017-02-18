@@ -117,6 +117,8 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 }
 
 int main(int argc, char* argv[]) {
+	// 0. Set the path to the Chrono data folder
+//	SetChronoDataPath(CHRONO_DATA_DIR);
 	std::vector<Points> p_ext;
 	std::vector<Points> p_int;
 	const std::string out_dir = "../";
@@ -135,8 +137,6 @@ int main(int argc, char* argv[]) {
 	materialDEM->SetFriction(0.4f);
 	materialDEM->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
 
-	// 0. Set the path to the Chrono data folder
-	SetChronoDataPath(CHRONO_DATA_DIR);
 
 	// 1. Create the system
 #ifdef USE_PENALTY
