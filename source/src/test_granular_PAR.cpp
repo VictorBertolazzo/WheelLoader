@@ -291,12 +291,12 @@ int main(int argc, char** argv) {
 
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
-		center.z += 2 * r;
+		center.z() += 2 * r;
 		// shrink uniformly the upper layer
-		hdims.x -= 2 * r;
-		hdims.y -= 2 * r;
+		hdims.x() -= 2 * r;
+		hdims.y() -= 2 * r;
 		// move the center abscissa by a 1*r 
-		center.x += r * pow(-1, il);
+		center.x() += r * pow(-1, il);
 
 	}
 
@@ -377,8 +377,8 @@ int main(int argc, char** argv) {
 			const ChVector<>& vel = granule->GetPos_dt();
 			outf << system->GetChTime() << " ";
 			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
-			outf << pos.x << " " << pos.y << " " << pos.z << " ";
-			outf << vel.x << " " << vel.y << " " << vel.z;
+			outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
+			outf << vel.x() << " " << vel.y() << " " << vel.z();
 			outf << std::endl << std::flush;
 		}
 #ifdef CHRONO_OPENGL

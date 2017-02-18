@@ -118,7 +118,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 
 int main(int argc, char* argv[]) {
 	// 0. Set the path to the Chrono data folder
-//	SetChronoDataPath(CHRONO_DATA_DIR);
+	SetChronoDataPath(CHRONO_DATA_DIR);
 	std::vector<Points> p_ext;
 	std::vector<Points> p_int;
 	const std::string out_dir = "../";

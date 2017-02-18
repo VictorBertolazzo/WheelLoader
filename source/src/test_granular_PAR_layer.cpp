@@ -380,12 +380,12 @@ int main(int argc, char** argv) {
 
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
-		center.z += 2 * r;
+		center.z() += 2 * r;
 		// shrink uniformly the upper layer
-		hdims.x -= 2 * r;
-		hdims.y -= 2 * r;
+		hdims.x() -= 2 * r;
+		hdims.y() -= 2 * r;
 		// move the center abscissa by a 1*r(DISABLED FOR THE MOMENT) 
-		center.x += r/2 * pow(-1, il);
+		center.x() += r/2 * pow(-1, il);
 
 	}
 
@@ -408,9 +408,9 @@ int main(int argc, char** argv) {
 			double mean_rs;
 			double dev_rs;
 			for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
-				double r = sqrt(pow((*body)->GetPos().x, 2) + pow((*body)->GetPos().y, 2));
+				double r = sqrt(pow((*body)->GetPos().x(), 2) + pow((*body)->GetPos().y(), 2));
 				rs.push_back(r);
-				double z = (*body)->GetPos().z;
+				double z = (*body)->GetPos().z();
 				zs.push_back(z);				
 			}
 			// Computation of sum,mean and sumofsquares,stdev
@@ -524,7 +524,7 @@ int main(int argc, char** argv) {
 				outs.precision(7);
 				outs << std::scientific;
 				for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
-					double x = (*body)->GetPos().x; double y = (*body)->GetPos().y; double z = (*body)->GetPos().z;
+					double x = (*body)->GetPos().x(); double y = (*body)->GetPos().y(); double z = (*body)->GetPos().z();
 					// no matter if one of the bodies is the terrain-Its erasing will be done offline
 					outs << x << "\t" << y << "\t" << z << endl;
 				}
@@ -552,8 +552,8 @@ int main(int argc, char** argv) {
 			const ChVector<>& vel = granule->GetPos_dt();
 			outf << system->GetChTime() << " ";  
 			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
-			outf << pos.x << " " << pos.y << " " << pos.z << " ";
-			outf << vel.x << " " << vel.y << " " << vel.z;
+			outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
+			outf << vel.x() << " " << vel.y() << " " << vel.z();
 			outf << std::endl << std::flush;
 		}
 #ifdef CHRONO_OPENGL

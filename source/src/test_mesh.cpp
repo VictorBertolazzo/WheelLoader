@@ -259,16 +259,16 @@ int main(int argc, char* argv[]) {
 
 						for (unsigned int it = 0; it < n_faces; ++it) {
 							// Calculate the triangle normal as a normalized cross product.
-							ChVector<> nrm = Vcross(vertices[idx_vertices[it].y] - vertices[idx_vertices[it].x], vertices[idx_vertices[it].z] - vertices[idx_vertices[it].x]);
+							ChVector<> nrm = Vcross(vertices[idx_vertices[it].y()] - vertices[idx_vertices[it].x()], vertices[idx_vertices[it].z()] - vertices[idx_vertices[it].x()]);
 							nrm.Normalize();
 							// Increment the normals of all incident vertices by the face normal
-							normals[idx_normals[it].x] += nrm;
-							normals[idx_normals[it].y] += nrm;
-							normals[idx_normals[it].z] += nrm;
+							normals[idx_normals[it].x()] += nrm;
+							normals[idx_normals[it].y()] += nrm;
+							normals[idx_normals[it].z()] += nrm;
 							// Increment the count of all incident vertices by 1
-							//accumulators[idx_normals[it].x] += 1;
-							//accumulators[idx_normals[it].y] += 1;
-							//accumulators[idx_normals[it].z] += 1;
+							//accumulators[idx_normals[it].x()] += 1;
+							//accumulators[idx_normals[it].y()] += 1;
+							//accumulators[idx_normals[it].z()] += 1;
 						}
 						auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
 						trimesh_shape->SetMesh(m_trimesh);
@@ -332,16 +332,16 @@ int main(int argc, char* argv[]) {
 
 			for (unsigned int it = 0; it < n_faces; ++it) {
 				// Calculate the triangle normal as a normalized cross product.
-				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y] - vertices[idx_vertices[it].x], vertices[idx_vertices[it].z] - vertices[idx_vertices[it].x]);
+				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y()] - vertices[idx_vertices[it].x()], vertices[idx_vertices[it].z()] - vertices[idx_vertices[it].x()]);
 				nrm.Normalize();
 				// Increment the normals of all incident vertices by the face normal
-				normals[idx_normals[it].x] += nrm;
-				normals[idx_normals[it].y] += nrm;
-				normals[idx_normals[it].z] += nrm;
+				normals[idx_normals[it].x()] += nrm;
+				normals[idx_normals[it].y()] += nrm;
+				normals[idx_normals[it].z()] += nrm;
 				// Increment the count of all incident vertices by 1
-				//accumulators[idx_normals[it].x] += 1;
-				//accumulators[idx_normals[it].y] += 1;
-				//accumulators[idx_normals[it].z] += 1;
+				//accumulators[idx_normals[it].x()] += 1;
+				//accumulators[idx_normals[it].y()] += 1;
+				//accumulators[idx_normals[it].z()] += 1;
 			}
 			auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
 			trimesh_shape->SetMesh(m_trimesh);
@@ -408,16 +408,16 @@ int main(int argc, char* argv[]) {
 
 			for (unsigned int it = 0; it < n_faces; ++it) {
 				// Calculate the triangle normal as a normalized cross product.
-				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y] - vertices[idx_vertices[it].x], vertices[idx_vertices[it].z] - vertices[idx_vertices[it].x]);
+				ChVector<> nrm = Vcross(vertices[idx_vertices[it].y()] - vertices[idx_vertices[it].x()], vertices[idx_vertices[it].z()] - vertices[idx_vertices[it].x()]);
 				nrm.Normalize();
 				// Increment the normals of all incident vertices by the face normal
-				normals[idx_normals[it].x] += nrm;
-				normals[idx_normals[it].y] += nrm;
-				normals[idx_normals[it].z] += nrm;
+				normals[idx_normals[it].x()] += nrm;
+				normals[idx_normals[it].y()] += nrm;
+				normals[idx_normals[it].z()] += nrm;
 				// Increment the count of all incident vertices by 1
-				//accumulators[idx_normals[it].x] += 1;
-				//accumulators[idx_normals[it].y] += 1;
-				//accumulators[idx_normals[it].z] += 1;
+				//accumulators[idx_normals[it].x()] += 1;
+				//accumulators[idx_normals[it].y()] += 1;
+				//accumulators[idx_normals[it].z()] += 1;
 			}
 			auto trimesh_shape = std::make_shared<ChTriangleMeshShape>();
 			trimesh_shape->SetMesh(m_trimesh);

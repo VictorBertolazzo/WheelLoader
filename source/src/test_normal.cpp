@@ -220,15 +220,15 @@ void AddMeshWall(std::shared_ptr<ChBody> body, const ChVector<>& dim, const ChVe
 	idx_vertices.resize(num_faces);
 	idx_normals.resize(num_faces);
 
-	vertices[0] = ChVector<>(-dim.x, -dim.y, -dim.z);
-	vertices[1] = ChVector<>(-dim.x, +dim.y, -dim.z);
-	vertices[2] = ChVector<>(+dim.x, +dim.y, -dim.z);
-	vertices[3] = ChVector<>(+dim.x, -dim.y, -dim.z);
+	vertices[0] = ChVector<>(-dim.x(), -dim.y(), -dim.z());
+	vertices[1] = ChVector<>(-dim.x(), +dim.y(), -dim.z());
+	vertices[2] = ChVector<>(+dim.x(), +dim.y(), -dim.z());
+	vertices[3] = ChVector<>(+dim.x(), -dim.y(), -dim.z());
 
-	vertices[4] = ChVector<>(-dim.x, -dim.y, +dim.z);
-	vertices[5] = ChVector<>(-dim.x, +dim.y, +dim.z);
-	vertices[6] = ChVector<>(+dim.x, +dim.y, +dim.z);
-	vertices[7] = ChVector<>(+dim.x, -dim.y, +dim.z);
+	vertices[4] = ChVector<>(-dim.x(), -dim.y(), +dim.z());
+	vertices[5] = ChVector<>(-dim.x(), +dim.y(), +dim.z());
+	vertices[6] = ChVector<>(+dim.x(), +dim.y(), +dim.z());
+	vertices[7] = ChVector<>(+dim.x(), -dim.y(), +dim.z());
 
 	idx_vertices[0] = ChVector<int>(0, 1, 3);
 	idx_vertices[1] = ChVector<int>(1, 2, 3);

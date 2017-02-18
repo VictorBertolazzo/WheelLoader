@@ -97,14 +97,14 @@ using std::endl;
 		std::vector<ChVector<double>> cloud;
 		double th = 0.5*r ;// or halve an input
 		// if statement only on lower 
-		if(lower.x !=0. && lower.y == 0.){
-			double ss = std::abs(lower.x);
+		if(lower.x() !=0. && lower.y() == 0.){
+			double ss = std::abs(lower.x());
 
 		cloud.push_back(lower + ChVector<>(-th,ss,0.));
 		cloud.push_back(lower + ChVector<>(+th,ss,0.));
 		cloud.push_back(lower + ChVector<>(-th,-ss,0.));
 		cloud.push_back(lower + ChVector<>(+th,-ss,0.));
-			double uu = std::abs(upper.x);
+			double uu = std::abs(upper.x());
 		cloud.push_back(upper + ChVector<>(-th,uu,0.));
 		cloud.push_back(upper + ChVector<>(+th,uu,0.));
 		cloud.push_back(upper + ChVector<>(-th,-uu,0.));
@@ -112,13 +112,13 @@ using std::endl;
 		
 		}
 		
-		if(lower.x == 0. && lower.y != 0.){
-			double ss = std::abs(lower.y);
+		if(lower.x() == 0. && lower.y() != 0.){
+			double ss = std::abs(lower.y());
 		cloud.push_back(lower + ChVector<>(ss,-th,0.));
 		cloud.push_back(lower + ChVector<>(ss,+th,0.));
 		cloud.push_back(lower + ChVector<>(-ss,-th,0.));
 		cloud.push_back(lower + ChVector<>(-ss,+th,0.));
-			double uu = std::abs(upper.y);
+			double uu = std::abs(upper.y());
 		cloud.push_back(upper + ChVector<>(uu,-th,0.));
 		cloud.push_back(upper + ChVector<>(uu,+th,0.));
 		cloud.push_back(upper + ChVector<>(-uu,-th,0.));
@@ -457,11 +457,11 @@ int main(int argc, char** argv) {
 
 
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(10* r - r, 10*r - r, 3.0);
+	ChVector<> hdims(10* r - r, 10*r - r, base2base_height);
 	ChVector<> center(0., 0., 0.0);//10r is the height of the funnel.
 							// First bunch of particles created
 							// gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, 3.0), hdims);
-								gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+								gen.createObjectsBox(utils::POISSON_DISK, 3 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
 
 	std::shared_ptr<ChBody> granule;  // tracked granule
 	std::ofstream outf;             // output file stream
@@ -544,8 +544,8 @@ int main(int argc, char** argv) {
 			const ChVector<>& vel = granule->GetPos_dt();
 			outf << system->GetChTime() << " ";
 			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
-			outf << pos.x << " " << pos.y << " " << pos.z << " ";
-			outf << vel.x << " " << vel.y << " " << vel.z;
+			outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
+			outf << vel.x() << " " << vel.y() << " " << vel.z();
 			outf << std::endl << std::flush;
 		}
 #ifdef CHRONO_OPENGL

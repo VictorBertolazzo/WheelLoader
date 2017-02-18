@@ -207,7 +207,7 @@ int main(int argc, char** argv) {
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 0;
 		sys->GetSettings()->solver.max_iteration_sliding = 200;
-		sys->GetSettings()->solver.max_iteration_spinning = 0;
+		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = -1;
 		sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
@@ -329,7 +329,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(radius_g/1.1);
+	m1->setDefaultSize(ChVector<>(radius_g, radius_g/2.0,0));
 	// Add new types of shapes to the generator, giving the percentage of each one
 		//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
@@ -374,7 +374,7 @@ int main(int argc, char** argv) {
 	ChVector<> hdims(0.20 - r, 0.20 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
 	ChVector<> center(0, 0, 1.50);
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.20, 1.45);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 3.6 * r, center, 0.20, 1.45);
 	//gen.createObjectsBox(utils::POISSON_DISK, 2.0*r, center, hdims);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
@@ -412,7 +412,7 @@ int main(int argc, char** argv) {
 	if (render) {
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
 		gl_window.Initialize(1280, 720, "Settling test", system);
-		gl_window.SetCamera(ChVector<>(0, -1, 0), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1), 0.05f);
+		gl_window.SetCamera(ChVector<>(0, -2, 0), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1), 0.05f);
 		gl_window.SetRenderMode(opengl::WIREFRAME);
 	}
 #endif
@@ -462,9 +462,9 @@ int main(int argc, char** argv) {
 			const ChVector<>& vel = granule->GetPos_dt();
 			outf << system->GetChTime() << " ";  
 			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
-			outf << pos.x << " " << pos.y << " " << pos.z << " ";
-			outf << vel.x << " " << vel.y << " " << vel.z;
-			outf << std::endl << std::flush;
+			/*outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
+			outf << vel.x() << " " << vel.y() << " " << vel.z();
+			*/outf << std::endl << std::flush;
 		}
 #ifdef CHRONO_OPENGL
 		if (render) {
