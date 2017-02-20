@@ -257,17 +257,17 @@ void CreateMechanism(ChSystem& system, std::shared_ptr<ChBody> ground){
 	rod_asset1->GetCylinderGeometry().rad = .025;
 	rod_asset1->GetCylinderGeometry().p1 = rod->GetFrame_COG_to_abs().GetInverse() * POS_lift2rod;
 	rod_asset1->GetCylinderGeometry().p2 = rod->GetFrame_COG_to_abs().GetInverse() * POS_rod2link;
-	//rod->AddAsset(rod_asset);
-	//rod->AddAsset(rod_asset1);
+	rod->AddAsset(rod_asset);
+	rod->AddAsset(rod_asset1);
 	auto col_r = std::make_shared<ChColorAsset>();
 	col_r->SetColor(ChColor(0.0f, 0.0f, 0.2f));
-	//rod->AddAsset(col_r);
+	rod->AddAsset(col_r);
 	geometry::ChTriangleMeshConnected rocker_mesh;
 	rocker_mesh.LoadWavefrontMesh(out_dir + "data/rockerarm_mod.obj", false, false);
 	auto rocker_mesh_shape = std::make_shared<ChTriangleMeshShape>();
 	rocker_mesh_shape->SetMesh(rocker_mesh);
 	rocker_mesh_shape->SetName("boom");
-	rod->AddAsset(rocker_mesh_shape);
+	//rod->AddAsset(rocker_mesh_shape);
 
 	// LINK
 	auto link = std::shared_ptr<ChBody>(system.NewBody());
@@ -624,6 +624,7 @@ int main(int argc, char** argv) {
 	system->AddBody(container);
 	container->SetIdentifier(-1);
 	container->SetMass(1);
+	container->SetPos(ChVector<>(10.0, 0.0, 0.0));
 	container->SetBodyFixed(true);
 	container->SetCollide(true);
 	container->SetMaterialSurface(material_terrain);
@@ -707,8 +708,7 @@ int main(int argc, char** argv) {
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(hdimX / 2 - r, hdimY / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, .5 * r);
-
+	ChVector<> center(10.0, 0, .5 * r);
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
 		center.z() += 2 * r;
