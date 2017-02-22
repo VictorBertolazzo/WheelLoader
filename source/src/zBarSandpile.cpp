@@ -54,14 +54,6 @@ int num_threads = 4;
 	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
 	double Ra_r = 1.5*radius_g;//Default Size of particles.
 
-
-	
-
-
-	// ----------------
-	// Model parameters
-	// ----------------
-
 	// Container dimensions
 	double hdimX = 1.0;
 	double hdimY = 1.0;
@@ -105,7 +97,21 @@ class MyWheelLoader {
 	// Data
 	
 	// Handles
+	//std::shared_ptr<ChBody> lift;
+	std::shared_ptr<ChBodyAuxRef> lift;
+	std::shared_ptr<ChBody> rod;
+	std::shared_ptr<ChBody> link;
+	std::shared_ptr<ChBodyAuxRef> bucket;
 	std::shared_ptr<ChBody> chassis;
+	
+	std::shared_ptr<ChLinkLockRevolute> rev_lift2rod;
+	std::shared_ptr<ChLinkLockRevolute> rev_rod2link;
+	std::shared_ptr<ChLinkLockRevolute> rev_lift2bucket;
+	std::shared_ptr<ChLinkLockRevolute> rev_link2bucket;
+	std::shared_ptr<ChLinkLockRevolute> rev_ch2lift;
+
+	std::shared_ptr<ChLinkLinActuator> lin_ch2lift;
+	std::shared_ptr<ChLinkLinActuator> lin_lift2rod;
 
 	// Utility Functions
 	enum BucketSide { LEFT, RIGHT };
@@ -259,15 +265,15 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 			////////////////////////--------------Create rigid bodies-------------------------------////////////////////////////////////////////
 			///////////////////////-----------------------------------------------------------------////////////////////////////////////////////
 	// LIFT
-	//auto lift = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());//switched to ChBodyAuxRef
-	auto lift = std::shared_ptr<ChBody>(system.NewBody());//switched to ChBodyAuxRef
+	lift = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());//switched to ChBodyAuxRef
+	//lift = std::shared_ptr<ChBody>(system.NewBody());//switched to ChBodyAuxRef
 	system.Add(lift);
 	lift->SetBodyFixed(false);
 	lift->SetName("lift arm");
-	//lift->SetPos(POS_ch2lift);// COG_lift changed
-	lift->SetPos(COG_lift);// COG_lift changed
-	// ChVector<> u1 = (POS_lift2bucket - POS_ch2lift).GetNormalized();//
-	ChVector<> u1 = (POS_lift2bucket - COG_lift).GetNormalized();//
+	lift->SetPos(POS_ch2lift);// switched to ChBodyAuxRef
+	//lift->SetPos(COG_lift);// COG_lift changed
+	ChVector<> u1 = (POS_lift2bucket - POS_ch2lift).GetNormalized();//switched to ChBodyAuxRef
+	//ChVector<> u1 = (POS_lift2bucket - COG_lift).GetNormalized();//
 	ChVector<> w1 = Vcross(u1, VECT_Y).GetNormalized();//overkill
 	ChMatrix33<> rot1;//no control on orthogonality
 	rot1.Set_A_axis(u1, VECT_Y, w1);
@@ -306,7 +312,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	lift->AddAsset(lift_mesh_shape);
 
 	// ROD
-	auto rod = std::shared_ptr<ChBody>(system.NewBody());
+	rod = std::shared_ptr<ChBody>(system.NewBody());
 	system.Add(rod);
 	rod->SetName("rod arm");
 	rod->SetIdentifier(3);
@@ -343,7 +349,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	//rod->AddAsset(rocker_mesh_shape);//temporary
 
 	//	// LINK
-	auto link = std::shared_ptr<ChBody>(system.NewBody());
+	link = std::shared_ptr<ChBody>(system.NewBody());
 	system.Add(link);
 	link->SetName("link arm");
 	link->SetIdentifier(3);
@@ -367,7 +373,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	link->AddAsset(col_l1);
 
 	//	// BUCKET
-	auto bucket = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());
+	bucket = std::shared_ptr<ChBodyAuxRef>(system.NewBodyAuxRef());
 	system.AddBody(bucket);
 	bucket->SetName("benna");
 	bucket->SetIdentifier(4);
@@ -396,7 +402,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	bucket->AddAsset(bucket_mesh_shape);
 
 	// CHASSIS
-	auto chassis = std::shared_ptr<ChBody>(system.NewBody());
+	chassis = std::shared_ptr<ChBody>(system.NewBody());
 	system.AddBody(chassis);
 	chassis->SetBodyFixed(true);
 	chassis->SetName("chassis");
@@ -416,7 +422,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	/////////////////////////////////////------------------Add joint constraints------------------////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Linear Actuator between the lift body and the so called rod(also known as rocker arm)
-	auto lin_lift2rod = std::make_shared<ChLinkLinActuator>();
+	lin_lift2rod = std::make_shared<ChLinkLinActuator>();
 	ChVector<> u11 = (POS_lift2lever - PIS_lift2lever).GetNormalized();		//GetNormalized() yields a unit vector(versor)
 	ChVector<> w11 = Vcross(u11, VECT_Y).GetNormalized();					//overkill
 	ChMatrix33<> rot11;														//no control on orthogonality, IT'S UP TO THE USER'
@@ -435,37 +441,37 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	
 		// Revolute Joint between the lift body and the rod, located near the geometric baricenter(int(r dA)/int(dA)) of the rod LIFT-ROD. 
 		// // It is the second of the three joints that interest the rod body(also known as rocker arm).
-	auto rev_lift2rod = std::make_shared<ChLinkLockRevolute>();
+	rev_lift2rod = std::make_shared<ChLinkLockRevolute>();
 	rev_lift2rod->SetName("revolute_lift2rod");
 	rev_lift2rod->Initialize(rod, lift, ChCoordsys<>(POS_lift2rod, z2y >> rot3.Get_A_quaternion()));		// z-dir default rev axis is rotated on y-dir
 	system.AddLink(rev_lift2rod);
 
 		// Revolute Joint between the rod body and link, last of the three joints interesting the rod , rear joint of the two concerning the link.
-	auto rev_rod2link = std::make_shared<ChLinkLockRevolute>();
+	rev_rod2link = std::make_shared<ChLinkLockRevolute>();
 	rev_rod2link->SetName("revolute_rod2link");
 	ChMatrix33<> rotb44;
 	rev_rod2link->Initialize(link, rod, ChCoordsys<>(POS_rod2link, z2y >> rotb44.Get_A_quaternion()));		// z-dir default rev axis is rotated on y-dir 
 	system.AddLink(rev_rod2link);
 		// LIFT-BUCKET revjoint
-	auto rev_lift2bucket = std::make_shared<ChLinkLockRevolute>();
+	rev_lift2bucket = std::make_shared<ChLinkLockRevolute>();
 	rev_lift2bucket->SetName("revolute_lift2bucket");
 	ChMatrix33<> rotb1;
 	rev_lift2bucket->Initialize(bucket, lift, ChCoordsys<>(POS_lift2bucket, z2y >> rotb1.Get_A_quaternion()));	// z-dir default rev axis is rotated on y-dir
 	system.AddLink(rev_lift2bucket);
 		// LINK-BUCKET revjoint
-	auto rev_link2bucket = std::make_shared<ChLinkLockRevolute>();
+	rev_link2bucket = std::make_shared<ChLinkLockRevolute>();
 	rev_link2bucket->SetName("revolute_link2bucket");
 	ChMatrix33<> rotb2;
 	rev_link2bucket->Initialize(bucket, link, ChCoordsys<>(POS_link2bucket, z2y >> rotb2.Get_A_quaternion()));	// z-dir default rev axis is rotated on y-dir
 	system.AddLink(rev_link2bucket);
 
 		// CHASSIS-LIFT revjoint
-	auto rev_ch2lift = std::make_shared<ChLinkLockRevolute>();
+	rev_ch2lift = std::make_shared<ChLinkLockRevolute>();
 	rev_ch2lift->SetName("revolute_chassis2lift");
 	rev_ch2lift->Initialize(lift, chassis,ChCoordsys<>(POS_ch2lift, z2y >> rot1.Get_A_quaternion()));	// z-dir default rev axis is rotated on y-dir
 	system.AddLink(rev_ch2lift);
 		// CHASSIS-LIFT linear actuator
-	auto lin_ch2lift = std::make_shared<ChLinkLinActuator>();
+	lin_ch2lift = std::make_shared<ChLinkLinActuator>();
 	ChVector<> u22 = (INS_ch2lift - PIS_ch2lift).GetNormalized();					//GetNormalized()
 	ChVector<> w22 = Vcross(u22, VECT_Y).GetNormalized();							//overkill
 	ChMatrix33<> rot22;																//no control on orthogonality, IT'S UP TO THE USER
@@ -483,12 +489,13 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 
 
 
-
 	}
 	// Destructor
 	~MyWheelLoader(){}
 	// Getter
-
+	void PrintValue(){
+		GetLog() << "This is a PrintValue() class method: " << chassis->GetPos().z() << "\n";
+	}
 	// Setter
 
 };
@@ -1144,7 +1151,18 @@ int main(int argc, char** argv) {
 	//CreateMechanism(*system, container);
 	MyWheelLoader* mywl = new MyWheelLoader(*system);
 	//system->ShowHierarchy(GetLog());
-	GetLog()<< mywl->chassis->GetPos() << "\n";
+				// Setting Lifting Function Example
+	auto act = std::dynamic_pointer_cast<ChLinkLinActuator>(mywl->lin_ch2lift);
+	auto fun = std::make_shared<ChFunction_Sine>();
+	fun->Set_freq(2.0); fun->Set_amp(.05);
+	//act->Set_dist_funct(fun);
+	if (act->Get_dist_funct() == fun){ GetLog() << act->Get_dist_funct() << " = " << fun << "--> test passed." << "\n"; }
+	else
+	{
+		GetLog() << "Test not passed\n";
+	}
+			// Setting Lifting Function Example
+
 	
 	// ----------------
 	// Create particles
@@ -1152,8 +1170,8 @@ int main(int argc, char** argv) {
 	
 					// utils::Generator gen = CreateParticles(system, material_terrain);
 	
-	// unsigned int num_particles = gen.getTotalNumBodies();
-	// std::cout << "Generated particles:  " << num_particles << std::endl;
+					// unsigned int num_particles = gen.getTotalNumBodies();
+					// std::cout << "Generated particles:  " << num_particles << std::endl;
 
 
 #ifdef CHRONO_OPENGL

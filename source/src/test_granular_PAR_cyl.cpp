@@ -97,21 +97,21 @@ int main(int argc, char** argv) {
 	//			C=2.5/3.5
 	//			D=3.5/4.5
 	// -------------------------
-	double Ra_d = 7.0*radius_g;//Distance from centers of particles.
+	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
 
 	// -------------------------
 	// Aliquotes
 	// -------------------------
-	double quote_sp = 0.00;//1
-	double quote_bs = 0.35;//2
-	double quote_el = 0.15;//3
-	double quote_cs = 0.00;//4
-	double quote_bx = 0.25;//5//.55-->3.7r spacing
+	double quote_sp = 0.10;//1
+	double quote_bs = 0.30;//2
+	double quote_el = 0.30;//3
+	double quote_cs = 0.30;//4
+	double quote_bx = 0.00;//5//.55-->3.7r spacing
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = 0.25;
+	double quote_sbx = 0.00;
 
 	// --------------------------
 	// Create output directories.
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
 
     binsX = 20;
     binsY = 20;
-    binsZ = 20;
+    binsZ = 60;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
@@ -205,13 +205,13 @@ int main(int argc, char** argv) {
 	case ChMaterialSurfaceBase::DVI: {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
-		sys->GetSettings()->solver.max_iteration_normal = 0;
-		sys->GetSettings()->solver.max_iteration_sliding = 500;
+		sys->GetSettings()->solver.max_iteration_normal = 200;
+		sys->GetSettings()->solver.max_iteration_sliding = 1000;
 		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = -1;
-		sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
-		sys->ChangeSolverType(SolverType::APGD);
+		sys->GetSettings()->collision.collision_envelope = 0.2 * radius_g;//0.1
+		sys->ChangeSolverType(SolverType::APGD);//BB,SPGQP,APGD
 		system = sys;
 
 		break;
@@ -224,8 +224,7 @@ int main(int argc, char** argv) {
 	system->GetSettings()->solver.tolerance = 0.1;
 	system->GetSettings()->solver.max_iteration_bilateral = 100;
 	system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
-	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ);
-
+	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ); 
 	// Set number of threads
 	system->SetParallelThreadNumber(num_threads);
 	CHOMPfunctions::SetNumThreads(num_threads);
@@ -329,7 +328,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(ChVector<>(.9*radius_g, radius_g/2.0,0));
+	m1->setDefaultSize(ChVector<>(.5*radius_g, radius_g/2,0.0));
 	// Add new types of shapes to the generator, giving the percentage of each one
 		//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
@@ -341,7 +340,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
 	m3->setDefaultMaterial(material_terrain);
 	m3->setDefaultDensity(rho_g);
-	m3->setDefaultSize(ChVector<>(0.5*radius_g, 0.5*radius_g, radius_g / 2));
+	m3->setDefaultSize(ChVector<>(0.5*radius_g, 0.3*radius_g, radius_g / 2));
 	//BOXES/
 	std::shared_ptr<utils::MixtureIngredient> m4 = gen.AddMixtureIngredient(utils::BOX, quote_bx);
 	m4->setDefaultMaterial(material_terrain);
@@ -370,10 +369,10 @@ int main(int argc, char** argv) {
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(0.20 - r, 0.20 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, 1.50);
+	ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
+	ChVector<> center(0, 0, 0.800);
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.350, center.z()-.05);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.3 * r, center, 0.030, center.z()-.05);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 
@@ -410,7 +409,7 @@ int main(int argc, char** argv) {
 	if (render) {
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
 		gl_window.Initialize(1280, 720, "Settling test", system);
-		gl_window.SetCamera(ChVector<>(0, -2, 0), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1), 0.05f);
+		gl_window.SetCamera(ChVector<>(0, -1, 0.5), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1), 0.05f);
 		gl_window.SetRenderMode(opengl::WIREFRAME);
 	}
 #endif
@@ -419,8 +418,8 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 1.50;
-	double time_step = 1e-3;//1e-4;e-
+	double time_end = 3.50;
+	double time_step = 1e-4;//1e-4;e-
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
