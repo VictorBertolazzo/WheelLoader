@@ -165,14 +165,14 @@ int main(int argc, char** argv) {
 	// -------------------------
 	// Aliquotes
 	// -------------------------
-	double quote_sp = 0.00;//1
-	double quote_bs = 0.15;//2
-	double quote_el = 0.35;//3
-	double quote_cs = 0.00;//4
-	double quote_bx = 0.50;//5
+	double quote_sp = 0.10;//1
+	double quote_bs = 0.40;//2
+	double quote_el = 0.45;//3
+	double quote_cs = 0.20;//4
+	double quote_bx = 0.05;//5//.55-->3.7r spacing
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = .15;
+	double quote_sbx = .10;
 
 
 	// --------------------------
@@ -414,12 +414,11 @@ int main(int argc, char** argv) {
 	container->GetCollisionModel()->BuildModel();
 
 	
-
 	// ----------------
 	// Create particles
 	// ----------------
 
-	// Create a particle generator and a mixture entirely made out of spheres
+	// Create a particle generator and a mixture entirely made out of bispheres
 	utils::Generator gen(system);
 	gen.setBodyIdentifier(Id_g);
 	// SPHERES
@@ -431,29 +430,35 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(radius_g / 1.1);
+	m1->setDefaultSize(ChVector<>(1.1*radius_g, radius_g / 2.0, 0));
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
 	m2->setDefaultMaterial(material_terrain);
 	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(ChVector<>(0.9*radius_g, 1.1*radius_g, radius_g / 1.2));// this need a vector  
+	m2->setDefaultSize(ChVector<>(0.75*radius_g, 1.2*radius_g, radius_g / 2));// this need a vector  
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//CAPSULES/
 	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
 	m3->setDefaultMaterial(material_terrain);
 	m3->setDefaultDensity(rho_g);
-	m3->setDefaultSize(radius_g / 2);
+	m3->setDefaultSize(ChVector<>(0.5*radius_g, 0.5*radius_g, radius_g / 2));
 	//BOXES/
 	std::shared_ptr<utils::MixtureIngredient> m4 = gen.AddMixtureIngredient(utils::BOX, quote_bx);
 	m4->setDefaultMaterial(material_terrain);
 	m4->setDefaultDensity(rho_g);
-	m4->setDefaultSize(radius_g);
+	m4->setDefaultSize(ChVector<>(radius_g, radius_g / 1.1, radius_g / 2.0));
 	//ROUNDED-CYLINDERS/
 	std::shared_ptr<utils::MixtureIngredient> m5 = gen.AddMixtureIngredient(utils::ROUNDEDCYLINDER, quote_rc);
 	m5->setDefaultMaterial(material_terrain);
 	m5->setDefaultDensity(rho_g);
-	m5->setDefaultSize(radius_g / 2);
+	m5->setDefaultSize(ChVector<>(0.5*radius_g, 0.5*radius_g, radius_g / 2));
+	//BOXES/
+	std::shared_ptr<utils::MixtureIngredient> m6 = gen.AddMixtureIngredient(utils::BOX, quote_sbx);
+	m6->setDefaultMaterial(material_terrain);
+	m6->setDefaultDensity(rho_g);
+	m6->setDefaultSize(radius_g);
+
 
 
 	double r = 1.01 * radius_g;
@@ -461,7 +466,7 @@ int main(int argc, char** argv) {
 	ChVector<> center(0., 0., 0.0);//10r is the height of the funnel.
 							// First bunch of particles created
 							// gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, 3.0), hdims);
-								gen.createObjectsBox(utils::POISSON_DISK, 3 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+								//gen.createObjectsBox(utils::POISSON_DISK, 3 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
 
 	std::shared_ptr<ChBody> granule;  // tracked granule
 	std::ofstream outf;             // output file stream
@@ -522,10 +527,10 @@ int main(int argc, char** argv) {
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
 
-		double test=system->GetChTime() / 0.25 - funnel_count;
+		double test=system->GetChTime() / 0.025 - funnel_count;
 
 		if (std::abs(test) < time_step) {
-			gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+			gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, 60*r), ChVector<>(4.0*r,4.0*r,0.0));
 			funnel_count += 1.;
 		}
 

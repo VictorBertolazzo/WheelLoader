@@ -97,21 +97,21 @@ int main(int argc, char** argv) {
 	//			C=2.5/3.5
 	//			D=3.5/4.5
 	// -------------------------
-	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
-	double Ra_r = 1.5*radius_g;//Default Size of particles.
+	double Ra_d = 7.0*radius_g;//Distance from centers of particles.
+	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
 
 	// -------------------------
 	// Aliquotes
 	// -------------------------
 	double quote_sp = 0.00;//1
-	double quote_bs = 0.10;//2
-	double quote_el = 0.35;//3
+	double quote_bs = 0.35;//2
+	double quote_el = 0.15;//3
 	double quote_cs = 0.00;//4
-	double quote_bx = 0.55;//5
+	double quote_bx = 0.25;//5//.55-->3.7r spacing
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = .00;
+	double quote_sbx = 0.25;
 
 	// --------------------------
 	// Create output directories.
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
 
     binsX = 20;
     binsY = 20;
-    binsZ = 10;
+    binsZ = 20;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 0;
-		sys->GetSettings()->solver.max_iteration_sliding = 200;
+		sys->GetSettings()->solver.max_iteration_sliding = 500;
 		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = -1;
@@ -285,21 +285,21 @@ int main(int argc, char** argv) {
 
 	container->GetCollisionModel()->ClearModel();
 	// Bottom box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -2*hthick),
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, 2*radius_g), ChVector<>(0, 0, 0.0),
 		ChQuaternion<>(1, 0, 0, 0), true);
-	// Front box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Rear box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Left box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Right box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	//container->GetCollisionModel()->BuildModel();
+	//// Front box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	//	ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Rear box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	//	ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Left box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	//	ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Right box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	//	ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	container->GetCollisionModel()->BuildModel();
 	
 
 	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
@@ -307,7 +307,7 @@ int main(int argc, char** argv) {
 
 	for (int ix = -40; ix < 40; ix++) {
 		for (int iy = -40; iy < 40; iy++) {
-			ChVector<> pos(ix * Ra_d, iy * Ra_d, -Ra_r);
+			ChVector<> pos(ix * Ra_d, iy * Ra_d, 0.0);
 			utils::AddSphereGeometry(container.get(), Ra_r, pos);
 		}
 	}
@@ -329,43 +329,42 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(ChVector<>(radius_g, radius_g/2.0,0));
+	m1->setDefaultSize(ChVector<>(.9*radius_g, radius_g/2.0,0));
 	// Add new types of shapes to the generator, giving the percentage of each one
 		//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
 	m2->setDefaultMaterial(material_terrain);
 	m2->setDefaultDensity(rho_g);
-	m2->setDefaultSize(ChVector<>(0.9*radius_g,1.1*radius_g,radius_g/1.2));// this need a vector  
+	m2->setDefaultSize(ChVector<>(0.75*radius_g,1.2*radius_g,radius_g/2));// this need a vector  
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//CAPSULES/
 	std::shared_ptr<utils::MixtureIngredient> m3 = gen.AddMixtureIngredient(utils::CAPSULE, quote_cs);
 	m3->setDefaultMaterial(material_terrain);
 	m3->setDefaultDensity(rho_g);
-	m3->setDefaultSize(radius_g);
+	m3->setDefaultSize(ChVector<>(0.5*radius_g, 0.5*radius_g, radius_g / 2));
 	//BOXES/
 	std::shared_ptr<utils::MixtureIngredient> m4 = gen.AddMixtureIngredient(utils::BOX, quote_bx);
 	m4->setDefaultMaterial(material_terrain);
 	m4->setDefaultDensity(rho_g);
-	m4->setDefaultSize(radius_g);
+	m4->setDefaultSize(ChVector<>(radius_g,radius_g/1.1,radius_g/2.0));
 	//ROUNDED-CYLINDERS/
 	std::shared_ptr<utils::MixtureIngredient> m5 = gen.AddMixtureIngredient(utils::ROUNDEDCYLINDER, quote_rc);
 	m5->setDefaultMaterial(material_terrain);
 	m5->setDefaultDensity(rho_g);
-	m5->setDefaultSize(radius_g);
+	m5->setDefaultSize(ChVector<>(0.5*radius_g, 0.5*radius_g, radius_g / 2));
 	//BOXES/
 	std::shared_ptr<utils::MixtureIngredient> m6 = gen.AddMixtureIngredient(utils::BOX, quote_sbx);
 	m6->setDefaultMaterial(material_terrain);
 	m6->setDefaultDensity(rho_g);
-	m6->setDefaultSize(radius_g);
-	
+	m6->setDefaultSize(ChVector<>(radius_g/6, radius_g/6, radius_g/6 ));
+
 	///////////////////////////////////////////-----THINGS TO DO-----//////////////////////////////
 	// 3m X 20cm cylinder                  --> 15k particles
 	// big box in the bottom               --> 
 	// DVI no cohesion but                 --> spinning and rolling
 	// see if you can get DEM-P without    --> 
 
-	// mechanism, ChFunctionRecorder for data ....
-	// bind together mech and sand
+	
 	///////////////////////////////////////////-----THINGS TO DO-----//////////////////////////////
 
 
@@ -374,8 +373,7 @@ int main(int argc, char** argv) {
 	ChVector<> hdims(0.20 - r, 0.20 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
 	ChVector<> center(0, 0, 1.50);
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 3.6 * r, center, 0.20, 1.45);
-	//gen.createObjectsBox(utils::POISSON_DISK, 2.0*r, center, hdims);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.5 * r, center, 0.350, center.z()-.05);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 
