@@ -180,8 +180,8 @@ int main(int argc, char** argv) {
 	int binsY = (int)std::ceil(hdimY / radius_g) / factor;
 	int binsZ = 1;
 
-    binsX = 20;
-    binsY = 20;
+    binsX = 120;
+    binsY = 120;
     binsZ = 60;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
@@ -206,12 +206,12 @@ int main(int argc, char** argv) {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 200;
-		sys->GetSettings()->solver.max_iteration_sliding = 1000;
+		sys->GetSettings()->solver.max_iteration_sliding = 400;
 		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
-		sys->GetSettings()->solver.contact_recovery_speed = -1;
-		sys->GetSettings()->collision.collision_envelope = 0.2 * radius_g;//0.1
-		sys->ChangeSolverType(SolverType::APGD);//BB,SPGQP,APGD
+		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
+		sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;//0.1
+		sys->ChangeSolverType(SolverType::APGD);
 		system = sys;
 
 		break;
@@ -370,9 +370,9 @@ int main(int argc, char** argv) {
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, 0.800);
+	ChVector<> center(0, 0, 20.500);//.800
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.3 * r, center, 0.030, center.z()-.05);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.060, center.z()-.05);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 

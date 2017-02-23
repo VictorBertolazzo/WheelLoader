@@ -160,19 +160,19 @@ int main(int argc, char** argv) {
 	//			C=2.5/3.5
 	//			D=3.5/4.5
 	// -------------------------
-	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
-	double Ra_r = 1.5*radius_g;//Default Size of particles.
+	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
+	double Ra_r = 3.0*radius_g;//Default Size of particles.
 	// -------------------------
 	// Aliquotes
 	// -------------------------
 	double quote_sp = 0.10;//1
-	double quote_bs = 0.40;//2
-	double quote_el = 0.45;//3
-	double quote_cs = 0.20;//4
-	double quote_bx = 0.05;//5//.55-->3.7r spacing
+	double quote_bs = 0.30;//2
+	double quote_el = 0.30;//3
+	double quote_cs = 0.30;//4
+	double quote_bx = 0.00;//5//.55-->3.7r spacing
 	double quote_rc = 0.00;//6
 
-	double quote_sbx = .10;
+	double quote_sbx = 0.00;
 
 
 	// --------------------------
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
 		sys->GetSettings()->solver.max_iteration_spinning = 0;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = -1;
-		sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
+		sys->GetSettings()->collision.collision_envelope = 0.2 * radius_g;// 0.1*rg in origin
 		sys->ChangeSolverType(SolverType::APGD);
 		system = sys;
 
@@ -337,77 +337,77 @@ int main(int argc, char** argv) {
 
 	container->GetCollisionModel()->ClearModel();
 	// Bottom box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, 2 * radius_g), ChVector<>(0, 0, 0.0),
 		ChQuaternion<>(1, 0, 0, 0), true);
-	// Front box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Rear box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
-		ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Left box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
-	// Right box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
-		ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Front box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	//	ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Rear box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+	//	ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Left box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	//	ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
+	//// Right box
+	//utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+	//	ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
 	container->GetCollisionModel()->BuildModel();
-
-	// ----------------
-	// Create Funnel
-	// ----------------
-	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
-	system->AddBody(funnel);
-	funnel->SetIdentifier(-10);
-	funnel->SetPos(ChVector<>(0.,0.,2*radius_g));
-	funnel->SetMass(1);
-	funnel->SetBodyFixed(false);
-	funnel->SetMaterialSurface(material_terrain);
-	switch (method) {
-		// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
-	case ChMaterialSurfaceBase::DEM: {
-		funnel->GetMaterialSurfaceDEM()->SetFriction(.1f);
-		break;
-	}
-	case ChMaterialSurfaceBase::DVI: {
-		funnel->GetMaterialSurface()->SetFriction(.1f);
-		break;
-	}
-	}
-	funnel->SetCollide(true);
-	funnel->GetCollisionModel()->ClearModel();
-	// OpenGL does not accept more than ONE visualization shape per body
-	double half_low_size = 6 *radius_g ;
-	double half_upp_size = 20 * radius_g ;
-	double base2base_height = 100 * radius_g;
-	AddWall(ChVector<>(half_low_size,.0,.0),ChVector<>(half_upp_size,.0,base2base_height),funnel,radius_g);
-	AddWall(ChVector<>(0.,half_low_size,.0),ChVector<>(0.,half_upp_size,base2base_height),funnel,radius_g);
-	AddWall(ChVector<>(-half_low_size,.0,.0),ChVector<>(-half_upp_size,.0,base2base_height),funnel,radius_g);
-	AddWall(ChVector<>(0.,-half_low_size,.0),ChVector<>(0.,-half_upp_size,base2base_height),funnel,radius_g);
-	funnel->GetCollisionModel()->BuildModel();
+	//////// ----------------
+	//////// Create Funnel
+	//////// ----------------
+	//////auto funnel = std::shared_ptr<ChBody>(system->NewBody());
+	//////system->AddBody(funnel);
+	//////funnel->SetIdentifier(-10);
+	//////funnel->SetPos(ChVector<>(0.,0.,2*radius_g));
+	//////funnel->SetMass(1);
+	//////funnel->SetBodyFixed(false);
+	//////funnel->SetMaterialSurface(material_terrain);
+	//////switch (method) {
+	//////	// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
+	//////case ChMaterialSurfaceBase::DEM: {
+	//////	funnel->GetMaterialSurfaceDEM()->SetFriction(.1f);
+	//////	break;
+	//////}
+	//////case ChMaterialSurfaceBase::DVI: {
+	//////	funnel->GetMaterialSurface()->SetFriction(.1f);
+	//////	break;
+	//////}
+	//////}
+	//////funnel->SetCollide(true);
+	//////funnel->GetCollisionModel()->ClearModel();
+	//////// OpenGL does not accept more than ONE visualization shape per body
+	//////double half_low_size = 6 *radius_g ;
+	//////double half_upp_size = 20 * radius_g ;
+	//////double base2base_height = 100 * radius_g;
+	//////AddWall(ChVector<>(half_low_size,.0,.0),ChVector<>(half_upp_size,.0,base2base_height),funnel,radius_g);
+	//////AddWall(ChVector<>(0.,half_low_size,.0),ChVector<>(0.,half_upp_size,base2base_height),funnel,radius_g);
+	//////AddWall(ChVector<>(-half_low_size,.0,.0),ChVector<>(-half_upp_size,.0,base2base_height),funnel,radius_g);
+	//////AddWall(ChVector<>(0.,-half_low_size,.0),ChVector<>(0.,-half_upp_size,base2base_height),funnel,radius_g);
+	//////funnel->GetCollisionModel()->BuildModel();
+	//////
+	////////----------------
+	//////// Create the Funnel Movement: this should be a constant velocity trajectory in z direction
+	//////// 
+	//////		// Linear actuator btw the container and the funnel, it simulates the raising of the latter which must be always closely over the sand heap top.
+	//////auto cont2fun = std::make_shared<ChLinkLockPrismatic>();
+	//////cont2fun->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
+	//////system->AddLink(cont2fun);
+	//////auto container2funnel = std::make_shared<ChLinkLinActuator>();
+	//////container2funnel->Initialize(funnel,container,false,ChCoordsys<>(funnel->GetPos(), QUNIT),ChCoordsys<>(container->GetPos(), QUNIT));
+	//////auto funnel_law = std::make_shared<ChFunction_Ramp>();
+	//////funnel_law->Set_ang(3.6*radius_g);// velocity of the funnel(10X test for simulation purposes).
+	//////container2funnel->Set_lin_offset(Vlength(container->GetPos()-funnel->GetPos()));
+	//////container2funnel->Set_dist_funct(funnel_law);
+	//////system->AddLink(container2funnel);
+	//////// test its goodness
 	
-	//----------------
-	// Create the Funnel Movement: this should be a constant velocity trajectory in z direction
-	// 
-			// Linear actuator btw the container and the funnel, it simulates the raising of the latter which must be always closely over the sand heap top.
-	auto cont2fun = std::make_shared<ChLinkLockPrismatic>();
-	cont2fun->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
-	system->AddLink(cont2fun);
-	auto container2funnel = std::make_shared<ChLinkLinActuator>();
-	container2funnel->Initialize(funnel,container,false,ChCoordsys<>(funnel->GetPos(), QUNIT),ChCoordsys<>(container->GetPos(), QUNIT));
-	auto funnel_law = std::make_shared<ChFunction_Ramp>();
-	funnel_law->Set_ang(3.6*radius_g);// velocity of the funnel(10X test for simulation purposes).
-	container2funnel->Set_lin_offset(Vlength(container->GetPos()-funnel->GetPos()));
-	container2funnel->Set_dist_funct(funnel_law);
-	system->AddLink(container2funnel);
-	// test its goodness
-	//--------------------
+	
 	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
 	//	double spacing = 3.5 * radius_g;
 
 	for (int ix = -40; ix < 40; ix++) {
 		for (int iy = -40; iy < 40; iy++) {
-			ChVector<> pos(ix * Ra_d, iy * Ra_d, -Ra_r);
+			ChVector<> pos(ix * Ra_d, iy * Ra_d, 0.0);
 			utils::AddSphereGeometry(container.get(), Ra_r, pos);
 		}
 	}
@@ -430,7 +430,7 @@ int main(int argc, char** argv) {
 	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, quote_bs);
 	m1->setDefaultMaterial(material_terrain);
 	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(ChVector<>(1.1*radius_g, radius_g / 2.0, 0));
+	m1->setDefaultSize(ChVector<>(.5*radius_g, radius_g / 2.0, 0));
 	// Add new types of shapes to the generator, giving the percentage of each one
 	//ELLIPSOIDS
 	std::shared_ptr<utils::MixtureIngredient> m2 = gen.AddMixtureIngredient(utils::ELLIPSOID, quote_el);
@@ -462,11 +462,12 @@ int main(int argc, char** argv) {
 
 
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(10* r - r, 10*r - r, base2base_height);
-	ChVector<> center(0., 0., 0.0);//10r is the height of the funnel.
-							// First bunch of particles created
-							// gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, 3.0), hdims);
-								//gen.createObjectsBox(utils::POISSON_DISK, 3 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
+	ChVector<> hdims(10* r - r, 10*r - r, 10*r);
+	////ChVector<> center(0., 0., 0.0);//10r is the height of the funnel.
+	ChVector<> center(0, 0, 0.125);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.3 * r, center, 0.030, .0);
+	// gen.createObjectsBox(utils::POISSON_DISK, 2*r , funnel->GetPos() + ChVector<>(.0, .0, 3.0), hdims);
+	//gen.createObjectsBox(utils::POISSON_DISK, 3 * r, funnel->GetPos() + ChVector<>(.0, .0, base2base_height+1.*r), hdims);
 
 	std::shared_ptr<ChBody> granule;  // tracked granule
 	std::ofstream outf;             // output file stream
@@ -527,10 +528,12 @@ int main(int argc, char** argv) {
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
 
-		double test=system->GetChTime() / 0.025 - funnel_count;
+		double test=system->GetChTime() / 0.1 - funnel_count;
 
 		if (std::abs(test) < time_step) {
-			gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, 60*r), ChVector<>(4.0*r,4.0*r,0.0));
+			gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.2 * r, center , 0.060, .0);
+
+			//gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, 60*r), ChVector<>(4.0*r,4.0*r,0.0));
 			funnel_count += 1.;
 		}
 
