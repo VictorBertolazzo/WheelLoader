@@ -49,7 +49,9 @@ int num_threads = 4;
 	bool render = true;
 	bool track_granule = false;
 	bool track_flatten = false;
-	double radius_g = 0.01;
+	double radius_g = 0.01;// 0.01 feasible dimension
+
+	double terrainHeight = .01;
 
 	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
 	double Ra_r = 1.5*radius_g;//Default Size of particles.
@@ -66,7 +68,7 @@ int num_threads = 4;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 24;// 
+	int num_layers = 24;//24 
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
@@ -112,6 +114,9 @@ class MyWheelLoader {
 
 	std::shared_ptr<ChLinkLinActuator> lin_ch2lift;
 	std::shared_ptr<ChLinkLinActuator> lin_lift2rod;
+
+	ChQuaternion<> z2y;
+	ChQuaternion<> z2x;
 
 	// Utility Functions
 	enum BucketSide { LEFT, RIGHT };
@@ -256,8 +261,6 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 
 	ChVector<> INS_ch2lift(1.8, 0, 1.1);						// Insertion of boom piston over lift body
 
-	ChQuaternion<> z2y;
-	ChQuaternion<> z2x;
 	z2y.Q_from_AngAxis(-CH_C_PI / 2, ChVector<>(1, 0, 0));
 	z2x.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(0, 1, 0));
 	
@@ -404,11 +407,12 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	// CHASSIS
 	chassis = std::shared_ptr<ChBody>(system.NewBody());
 	system.AddBody(chassis);
-	chassis->SetBodyFixed(true);
+	chassis->SetBodyFixed(false);//temporary
 	chassis->SetName("chassis");
 	chassis->SetIdentifier(0);
 	chassis->SetMass(2000.0);
 	chassis->SetPos(COG_chassis);
+	chassis->SetPos_dt(ChVector<>(5.25, .0, .0));
 	chassis->SetInertiaXX(ChVector<>(500., 1000., 500.));
 		// visualization properties
 	auto chassis_asset = std::make_shared<ChSphereShape>();//asset
@@ -434,9 +438,11 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	auto bp_asset = std::make_shared<ChPointPointSegment>();				//asset
 	lin_lift2rod->AddAsset(bp_asset);
 	// A test law for the actuator--> it'll be substitued by an accessor method->no more inplace law definiton in the future.
-	auto legge1 = std::make_shared<ChFunction_Ramp>();
-	legge1->Set_ang(.00);
-	lin_lift2rod->Set_dist_funct(legge1);
+	auto legge1 = std::make_shared<ChFunction_Ramp>();legge1->Set_ang(.10);
+	auto legge2 = std::make_shared<ChFunction_Const>();
+	auto legge3 = std::make_shared<ChFunction_Ramp>();legge3->Set_ang(-.005);
+	auto tilt_law = std::make_shared<ChFunction_Sequence>();tilt_law->InsertFunct(legge1, 0.01, 1, true);tilt_law->InsertFunct(legge2, 2.5, 1., true);tilt_law->InsertFunct(legge3, 2.75, 1., true);
+	lin_lift2rod->Set_dist_funct(tilt_law);
 	system.Add(lin_lift2rod);
 	
 		// Revolute Joint between the lift body and the rod, located near the geometric baricenter(int(r dA)/int(dA)) of the rod LIFT-ROD. 
@@ -479,16 +485,11 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	lin_ch2lift->SetName("linear_chassis2lift");
 	lin_ch2lift->Initialize(lift, chassis, false, ChCoordsys<>(INS_ch2lift, z2x >> rot22.Get_A_quaternion()), ChCoordsys<>(PIS_ch2lift, z2x >> rot11.Get_A_quaternion()));//m2 is the master
 	lin_ch2lift->Set_lin_offset(Vlength(INS_ch2lift - PIS_ch2lift));
-	// temporary piston law for chassis2lift actuator -> it'll be set constant by default and changeacle by accessor
-	auto legge2 = std::make_shared<ChFunction_Ramp>();
-	legge2->Set_ang(.50);
-	lin_ch2lift->Set_dist_funct(legge2);
+	// temporary piston law for chassis2lift actuator -> it'll be set constant by default and changeable by accessor
+	auto legge = std::make_shared<ChFunction_Ramp>();
+	legge->Set_ang(0.);
+	lin_ch2lift->Set_dist_funct(legge);
 	system.Add(lin_ch2lift);
-
-	
-
-
-
 	}
 	// Destructor
 	~MyWheelLoader(){}
@@ -996,8 +997,8 @@ utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSur
 
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
-	ChVector<> hdims(1.0 / 2 - r, 1.0 / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(10.0, 0, .5 * r);
+	ChVector<> hdims(1.5 / 2 - r, 1.5 / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
+	ChVector<> center(5.00, 0, terrainHeight + r );
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
 		center.z() += 2 * r;
@@ -1018,7 +1019,7 @@ std::shared_ptr<ChBody> CreateTerrain(ChSystem* system, std::shared_ptr<ChMateri
 	system->AddBody(container);
 	container->SetIdentifier(-1);
 	container->SetMass(1);
-	container->SetPos(ChVector<>(10.0, 0.0, 0.0));
+	container->SetPos(ChVector<>(5.00, 0.0, terrainHeight));
 	container->SetBodyFixed(true);
 	container->SetCollide(true);
 	container->SetMaterialSurface(material_terrain);
@@ -1142,7 +1143,7 @@ int main(int argc, char** argv) {
 	// Create the Terrain
 	// ----------------
 
-					//	std::shared_ptr<ChBody> container = CreateTerrain(system, material_terrain);
+						std::shared_ptr<ChBody> container = CreateTerrain(system, material_terrain);
 	
 	// ----------------
 	// Create the Mechanism
@@ -1150,7 +1151,7 @@ int main(int argc, char** argv) {
 	
 	//CreateMechanism(*system, container);
 	MyWheelLoader* mywl = new MyWheelLoader(*system);
-	//system->ShowHierarchy(GetLog());
+	system->ShowHierarchy(GetLog());
 				// Setting Lifting Function Example
 	auto act = std::dynamic_pointer_cast<ChLinkLinActuator>(mywl->lin_ch2lift);
 	auto fun = std::make_shared<ChFunction_Sine>();
@@ -1162,13 +1163,26 @@ int main(int argc, char** argv) {
 		GetLog() << "Test not passed\n";
 	}
 			// Setting Lifting Function Example
+	// CHASSIS-GROUND prismatic+linactuator
+	auto prism_fix2ch = std::make_shared<ChLinkLockPrismatic>();
+	prism_fix2ch->SetName("prismatic_ground2chassis");
+	prism_fix2ch->Initialize(mywl->chassis, container, ChCoordsys<>(mywl->chassis->GetPos(),mywl->z2x));
+	system->AddLink(prism_fix2ch);
+	////////auto lin_fix2ch = std::make_shared<ChLinkLinActuator>();
+	////////prism_fix2ch->SetName("linear_ground2chassis");
+	////////lin_fix2ch->Initialize(chassis, ground, false, ChCoordsys<>(COG_chassis, z2x), ChCoordsys<>(COG_chassis, z2x));//m2 is the master
+	////////lin_fix2ch->Set_lin_offset(Vlength(VNULL));
+	////////system.AddLink(lin_fix2ch);
+	////auto chassis_law = std::make_shared<ChFunction_Ramp>();
+	////chassis_law->Set_ang(10);//it'll act as the chassis speed
+	////lin_fix2ch->Set_dist_funct(chassis_law);
 
 	
 	// ----------------
 	// Create particles
 	// ----------------
 	
-					// utils::Generator gen = CreateParticles(system, material_terrain);
+					utils::Generator gen = CreateParticles(system, material_terrain);
 	
 					// unsigned int num_particles = gen.getTotalNumBodies();
 					// std::cout << "Generated particles:  " << num_particles << std::endl;
@@ -1191,8 +1205,8 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 15.0;
-	double time_step = 1e-2;//1e-4 DEM-P;//n\a DEM--C
+	double time_end = 150.0;
+	double time_step = 1e-4;//1e-4 DEM-P;//n\a DEM--C
 
 
 
