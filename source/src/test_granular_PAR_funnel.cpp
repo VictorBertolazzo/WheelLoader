@@ -89,6 +89,11 @@ int out_fps = 60;
 using std::cout;
 using std::endl;
 // --------------------------------------------------------------------------
+// -------------------------
+// Tuning Parameters
+// -------------------------
+double radius_g = 0.01;
+// Tuning Parameters
 
 
 // Funnel utility Function
@@ -138,7 +143,20 @@ using std::endl;
 
 		body->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 	}
+// Particle Runtime Generation	
+	int SpawnParticles(utils::Generator* gen) {
+		double dist = 2 * 0.99 * radius_g;
 
+		////gen->createObjectsBox(utils::POISSON_DISK,
+		////                     dist,
+		////                     ChVector<>(9, 0, 3),
+		////                     ChVector<>(0, 1, 0.5),
+		////                     ChVector<>(-initVel, 0, 0));
+		gen->createObjectsCylinderZ(utils::POISSON_DISK, dist, ChVector<>(0, 0, 0.25), 0.030f, 0, ChVector<>(0, 0, 0));
+		cout << "  total bodies: " << gen->getTotalNumBodies() << endl;
+
+		return gen->getTotalNumBodies();
+	}
 
 int main(int argc, char** argv) {
 	int num_threads = 4;
@@ -147,10 +165,7 @@ int main(int argc, char** argv) {
 	bool render = true;
 	bool track_granule = false;
 
-	// -------------------------
-	// Tuning Parameters
-	// -------------------------
-	double radius_g = 0.01;
+	
 
 	// -------------------------
 	// Bumby Terrain
@@ -421,6 +436,7 @@ int main(int argc, char** argv) {
 	// Create a particle generator and a mixture entirely made out of bispheres
 	utils::Generator gen(system);
 	gen.setBodyIdentifier(Id_g);
+
 	// SPHERES
 	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, quote_sp);
 	m0->setDefaultMaterial(material_terrain);
@@ -531,9 +547,7 @@ int main(int argc, char** argv) {
 		double test=system->GetChTime() / 0.1 - funnel_count;
 
 		if (std::abs(test) < time_step) {
-			gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.2 * r, center , 0.060, .0);
-
-			//gen.createObjectsBox(utils::POISSON_DISK, 2 * r, funnel->GetPos() + ChVector<>(.0, .0, 60*r), ChVector<>(4.0*r,4.0*r,0.0));
+			SpawnParticles(&gen);
 			funnel_count += 1.;
 		}
 
