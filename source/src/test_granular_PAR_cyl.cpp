@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 200;
-		sys->GetSettings()->solver.max_iteration_sliding = 400;
+		sys->GetSettings()->solver.max_iteration_sliding = 200;
 		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
@@ -370,9 +370,9 @@ int main(int argc, char** argv) {
 	// Create particles in layers until reaching the desired number of particles
 	double r = 1.01 * radius_g;
 	ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(0, 0, 20.500);//.800
+	ChVector<> center(0, 0, 3.500);//.800
 
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.060, center.z()-.05);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.030, center.z()-.05);
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 
@@ -419,7 +419,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 3.50;
-	double time_step = 1e-4;//1e-4;e-
+	double time_step = 1e-3;//1e-4;e-
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
