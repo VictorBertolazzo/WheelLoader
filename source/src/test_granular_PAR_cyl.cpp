@@ -104,10 +104,10 @@ int main(int argc, char** argv) {
 	// -------------------------
 	// Aliquotes
 	// -------------------------
-	double quote_sp = 0.10;//1
-	double quote_bs = 0.30;//2
-	double quote_el = 0.30;//3
-	double quote_cs = 0.30;//4
+	double quote_sp = 0.20;//1//.10 crash
+	double quote_bs = 0.40;//2//.30 crash
+	double quote_el = 0.40;//3//.30 crash
+	double quote_cs = 0.00;//4//.30 crash
 	double quote_bx = 0.00;//5//.55-->3.7r spacing
 	double quote_rc = 0.00;//6
 
