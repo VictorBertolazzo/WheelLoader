@@ -31,6 +31,8 @@
 
 using namespace chrono;
 
+
+
 // --------------------------------------------------------------------------
 
 void TimingHeader() {
@@ -66,6 +68,8 @@ void TimingOutput(chrono::ChSystem* mSys) {
 
 double ComputeKineticEnergy(ChBody* body){
 	double kin = body->GetMass();
+	ChMatrix33<> I = body->GetInertia();
+	ChVector <> xdot = body->GetPos_dt();
 	return kin;
 }
 // PovRay Output
@@ -140,7 +144,7 @@ int main(int argc, char** argv) {
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
 	float restitution_terrain = 0.0f;
-	float Y_terrain = 8e5f;
+	float Y_terrain = 1e6f;
 	float nu_terrain = 0.3f;
 	float kn_terrain = 1.0e7f;// 1.0e7f;
 	float gn_terrain = 1.0e3f;
@@ -179,9 +183,9 @@ int main(int argc, char** argv) {
 	}
 	case ChMaterialSurfaceBase::DVI: {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
-		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
-		sys->GetSettings()->solver.max_iteration_normal = 200;
-		sys->GetSettings()->solver.max_iteration_sliding = 200;
+		sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;
+		sys->GetSettings()->solver.max_iteration_normal = 0;
+		sys->GetSettings()->solver.max_iteration_sliding = 0;
 		sys->GetSettings()->solver.max_iteration_spinning = 200;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
@@ -239,8 +243,9 @@ int main(int argc, char** argv) {
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);
 
-		mat_ter->SetSpinningFriction(0.15*radius_g);
-		mat_ter->SetRollingFriction(0.15*radius_g);
+		mat_ter->SetSpinningFriction(2.0*radius_g);
+
+		mat_ter->SetRollingFriction(2.0*radius_g);
 
 		material_terrain = mat_ter;
 
@@ -328,7 +333,7 @@ int main(int argc, char** argv) {
 	std::cout << "Generated particles:  " << num_particles << std::endl;
 		
 
-	// Computing Averaging Kinetic,Potential Energy
+	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
 
 	std::vector<std::shared_ptr<ChBody>> particlelist;
 	auto original_bodylist = system->Get_bodylist();
@@ -385,7 +390,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 300.00;
-	double time_step = 1e-3;//1.5e-5;
+	double time_step = 1e-4;//1.5e-5;
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
