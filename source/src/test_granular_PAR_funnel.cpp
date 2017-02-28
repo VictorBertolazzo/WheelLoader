@@ -44,9 +44,31 @@
 #include "chrono/physics/ChLinkLinActuator.h"
 #include "chrono/collision/ChCCollisionUtils.h"
 
+#include "chrono/core/ChLog.h"
+#include "chrono/core/ChVectorDynamic.h"
+#include "chrono/motion_functions/ChFunction_Recorder.h"
+#include "chrono/motion_functions/ChFunction_Sine.h"
+
+#include "chrono_postprocess/ChGnuPlot.h"
+
+
+
+
 using namespace chrono;
 using namespace chrono::collision;
+using namespace postprocess;
+// Computing Kinetic Energy of each particle
+double ComputeKineticEnergy(ChBody* body){
 
+	double mass = body->GetMass();
+	ChMatrix33<> I = body->GetInertia();
+	ChVector <> xdot = body->GetPos_dt();
+	ChVector <> omega = body->GetWvel_loc();
+
+	double kin = mass* xdot.Dot(xdot) + omega.Dot(I.Matr_x_Vect(omega));
+	kin = kin / 2;	return kin;
+
+}
 // --------------------------------------------------------------------------
 
 void TimingHeader() {
@@ -93,6 +115,7 @@ using std::endl;
 // Tuning Parameters
 // -------------------------
 double radius_g = 0.01;
+double rollfr = 0.0 * radius_g;
 // Tuning Parameters
 
 
@@ -337,6 +360,10 @@ int main(int argc, char** argv) {
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);
 
+		mat_ter->SetSpinningFriction(rollfr);
+
+		mat_ter->SetRollingFriction(rollfr);
+
 		material_terrain = mat_ter;
 
 		break;
@@ -522,7 +549,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 100.00;
+	double time_end = 1.00;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
@@ -542,9 +569,33 @@ int main(int argc, char** argv) {
 	int next_out_frame = 0;
 	
 	double funnel_count = 1.;
+	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
+
+	std::vector<std::shared_ptr<ChBody>> particlelist;
+	auto original_bodylist = system->Get_bodylist();
+	//for (int i = 0; i < original_bodylist->size(); i++) { auto mbody = std::shared_ptr<ChBody>(original_bodylist[original_bodylist.begin()+i]);
+	//															particlelist.push_back(mbody);			}
+	for (auto body = original_bodylist->begin(); body != original_bodylist->end(); ++body) {
+		auto mbody = std::shared_ptr<ChBody>(*body);
+		particlelist.push_back(mbody);
+	}
+	particlelist.erase(particlelist.begin()); // delete terrain body from the list
+	//particlelist.erase(particlelist.begin()); // delete torus body from the list
+
+	double avkinenergy = 0.;
+	ChFunction_Recorder mfun;
 
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
+		auto list = system->Get_bodylist();
+//		for (auto body = list->begin(); body != list->end(); ++body) {
+				for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+		auto mbody = std::shared_ptr<ChBody>(*body);
+			avkinenergy += ComputeKineticEnergy(mbody.get());
+					}
+		avkinenergy /= particlelist.size();
+		mfun.AddPoint(system->GetChTime(), avkinenergy);
+
 
 		double test=system->GetChTime() / 0.1 - funnel_count;
 
@@ -593,6 +644,10 @@ int main(int argc, char** argv) {
 	std::cout << "    Update:      " << cum_update_time << std::endl;
 	std::cout << std::endl;
 
+	// Gnuplot
+	ChGnuPlot mplot("__tmp_gnuplot_4.gpl");
+	mplot.SetGrid();
+	mplot.Plot(mfun, "Kinetic Energy of the system", " with lines lt -1 lc rgb'#00AAEE' ");
 
 	return 0;
 }

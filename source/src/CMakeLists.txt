@@ -9,6 +9,7 @@ SET(MODELS
   test_mesh
   test_normal
   test_normal_PAR
+  test_rolling_friction
   zBarlinkage
   zBarlinkage_PAR
   zBarSandpile

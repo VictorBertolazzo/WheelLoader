@@ -1,7 +1,13 @@
 // First test of binding together granular matter and loader mechanism.
 // Victor Bertolazzo
+
+	// DEM-P with cohesion force at the moment.
 	// mechanism, ChFunctionRecorder for data ....
+	// Drive actuator with a CallbackSpring in which input your data.
+	// Create a flag with which choose how to drive actuator(FORCE/DISPLACEMENT)
+	// Choose actuator funciton in the main
 	// bind together mech and sand
+	// What happens when bucket hits the pile.
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -1055,10 +1061,9 @@ int main(int argc, char** argv) {
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
-	// Create the parallel system
+	// Create system and set method-specific solver settings
 	// --------------------------
 
-	// Create system and set method-specific solver settings
 	chrono::ChSystemParallel* system;
 
 	switch (method) {
