@@ -85,7 +85,7 @@ int num_threads = 4;
 	float gn_terrain = 1.0e3f;
 	float kt_terrain = 2.86e3f;// 2.86e6f;
 	float gt_terrain = 1.0e3f;
-	float coh_pressure_terrain = 1e4f;// 0e3f;
+	float coh_pressure_terrain = 1e3f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
 	// Estimates for number of bins for broad-phase
@@ -94,9 +94,9 @@ int num_threads = 4;
 	// int binsY = (int)std::ceil(hdimY / radius_g) / factor;
 	// int binsZ = 1;
 
-	int binsX = 20;
-	int binsY = 20;
-	int binsZ = 10;
+	int binsX = 30;
+	int binsY = 30;
+	int binsZ = 30;
 //////-----------------------------------------GLOBAL VARIABLES------------------------////////////////////////////////////
 
 // ------------------CLASSES----------------------------------------------
@@ -418,7 +418,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	chassis->SetIdentifier(0);
 	chassis->SetMass(2000.0);
 	chassis->SetPos(COG_chassis);
-	chassis->SetPos_dt(ChVector<>(5.25, .0, .0));
+	chassis->SetPos_dt(ChVector<>(2.25, .0, .0));
 	chassis->SetInertiaXX(ChVector<>(500., 1000., 500.));
 		// visualization properties
 	auto chassis_asset = std::make_shared<ChSphereShape>();//asset
@@ -1211,7 +1211,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 150.0;
-	double time_step = 1e-4;//1e-4 DEM-P;//n\a DEM--C
+	double time_step = 1e-6;//1e-4 DEM-P;//n\a DEM--C
 
 
 
