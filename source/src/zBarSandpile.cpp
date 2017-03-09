@@ -57,7 +57,13 @@ int num_threads = 4;
 	bool track_flatten = false;
 	double radius_g = 0.01;// 0.01 feasible dimension
 
+	double r = 1.01 * radius_g;
+
 	double terrainHeight = .01;
+
+	ChVector<> pilepoint(5.50,.0,.0);// x=5.
+	ChVector<> terrain_center = pilepoint + ChVector<>(0.00, 0.0, terrainHeight);
+	ChVector<> center = pilepoint + ChVector<>(0.00, 0, terrainHeight + r);
 
 	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
 	double Ra_r = 1.5*radius_g;//Default Size of particles.
@@ -79,13 +85,13 @@ int num_threads = 4;
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
 	float restitution_terrain = 0.0f;
-	float Y_terrain = 8e5f;
+	float Y_terrain = 8e4f;
 	float nu_terrain = 0.3f;
 	float kn_terrain = 1.0e4f;// 1.0e7f;
-	float gn_terrain = 1.0e3f;
+	float gn_terrain = 1.0e2f;
 	float kt_terrain = 2.86e3f;// 2.86e6f;
-	float gt_terrain = 1.0e3f;
-	float coh_pressure_terrain = 1e3f;// 0e3f;
+	float gt_terrain = 1.0e2f;
+	float coh_pressure_terrain = 1e2f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
 	// Estimates for number of bins for broad-phase
@@ -1002,9 +1008,8 @@ utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSur
 
 
 	// Create particles in layers until reaching the desired number of particles
-	double r = 1.01 * radius_g;
 	ChVector<> hdims(1.5 / 2 - r, 1.5 / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-	ChVector<> center(5.00, 0, terrainHeight + r );
+	
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
 		center.z() += 2 * r;
@@ -1025,7 +1030,7 @@ std::shared_ptr<ChBody> CreateTerrain(ChSystem* system, std::shared_ptr<ChMateri
 	system->AddBody(container);
 	container->SetIdentifier(-1);
 	container->SetMass(1);
-	container->SetPos(ChVector<>(5.00, 0.0, terrainHeight));
+	container->SetPos(terrain_center);
 	container->SetBodyFixed(true);
 	container->SetCollide(true);
 	container->SetMaterialSurface(material_terrain);
@@ -1210,8 +1215,8 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 150.0;
-	double time_step = 1e-6;//1e-4 DEM-P;//n\a DEM--C
+	double time_end = 15.0;
+	double time_step = 1e-5;//1e-4 DEM-P;//n\a DEM--C
 
 
 
