@@ -53,40 +53,53 @@ using namespace chrono;
 const std::string out_dir = "../DEMP_ZBARSANDPILE";
 const std::string pov_dir = out_dir + "/POVRAY";
 
-bool povray_output = true;
+bool povray_output = false;
+// Actuator test times : VALUES
+double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double ta5 =12.00;
+// Actuator test times : TESTING IDEA
+		// Tilt : constant until ta4, then negative displacement(piling) until ta5, at the end constant til ta3;
+		// Lift : constant until ta1, then positive displacement(piling) til ta2, at the constant til ta3;
+		// chassis : FWD motion til ta1, stop until ta2, then RWD til ta3;
 
-int num_threads = 4;
+int num_threads = 8;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
 	bool use_mat_properties = true;
-	bool render = false;
+	bool render = true;
 	bool track_granule = false;
 	bool track_flatten = false;
-	double radius_g = 0.01;// 0.01 feasible dimension
-
+	double radius_g = 0.05;// 0.01 feasible dimension
+							// 0.01 Working Desktop Version : switched to 5cm to reduce number of bodies
 	double r = 1.01 * radius_g;
 
 	double terrainHeight = .01;
 
-	ChVector<> pilepoint(5.50,.0,.0);// x=5.
+	ChVector<> pilepoint(8.50,.0,.0);// Working Desktop Version x=5.50;
 	ChVector<> terrain_center = pilepoint + ChVector<>(0.00, 0.0, terrainHeight);
 	ChVector<> center = pilepoint + ChVector<>(0.00, 0, terrainHeight + r);
+
+	// Create particles in layers until reaching the desired number of particles
+	// Container dimensions
+	double hdimX = 7.5; // 1.5 Working Desktop Version
+	double hdimY = 7.5; // 1.5 Working Desktop Version 
+	double hdimZ = 0.5;
+	double hthick = 0.25;
+
+	// Working Desktop Version
+	//ChVector<> hdims(1.5 / 2 - r, 1.5 / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
+	ChVector<> hdims(hdimX / 2 - r, hdimY / 2 - r, 0);
+
 
 	double Ra_d = 2.5*radius_g;//Distance from centers of particles.
 	double Ra_r = 1.5*radius_g;//Default Size of particles.
 
-	// Container dimensions
-	double hdimX = 1.0;
-	double hdimY = 1.0;
-	double hdimZ = 0.5;
-	double hthick = 0.25;
-
+	
 	// Granular material properties
 	int Id_g = 10000;
 	double rho_g = 2500;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 24;//24 
+	int num_layers = 24;// Working Desktop Version : 24 ;
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
@@ -430,7 +443,7 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	chassis->SetIdentifier(0);
 	chassis->SetMass(2000.0);
 	chassis->SetPos(COG_chassis);
-	chassis->SetPos_dt(ChVector<>(2.25, .0, .0));
+	chassis->SetPos_dt(ChVector<>(.0, .0, .0));// u=2.25m/s
 	chassis->SetInertiaXX(ChVector<>(500., 1000., 500.));
 		// visualization properties
 	auto chassis_asset = std::make_shared<ChSphereShape>();//asset
@@ -456,10 +469,12 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	auto bp_asset = std::make_shared<ChPointPointSegment>();				//asset
 	lin_lift2rod->AddAsset(bp_asset);
 	// A test law for the actuator--> it'll be substitued by an accessor method->no more inplace law definiton in the future.
-	auto legge1 = std::make_shared<ChFunction_Ramp>();legge1->Set_ang(.10);
-	auto legge2 = std::make_shared<ChFunction_Const>();
-	auto legge3 = std::make_shared<ChFunction_Ramp>();legge3->Set_ang(-.005);
-	auto tilt_law = std::make_shared<ChFunction_Sequence>();tilt_law->InsertFunct(legge1, 0.01, 1, true);tilt_law->InsertFunct(legge2, 2.5, 1., true);tilt_law->InsertFunct(legge3, 2.75, 1., true);
+	// temporary piston law for lift2rod actuator -> it'll be set constant by default and changeable by accessor
+	// Note : it is as displacement law
+	auto legget1 = std::make_shared<ChFunction_Const>(); 
+	auto legget2 = std::make_shared<ChFunction_Ramp>(); legget2->Set_ang(-.008);
+	auto legget3 = std::make_shared<ChFunction_Const>();
+	auto tilt_law = std::make_shared<ChFunction_Sequence>();tilt_law->InsertFunct(legget1, ta4, 1, true);tilt_law->InsertFunct(legget2, ta5-ta4, 1., true);tilt_law->InsertFunct(legget3, ta3-ta5, 1., true);
 	lin_lift2rod->Set_dist_funct(tilt_law);
 	system.Add(lin_lift2rod);
 	
@@ -504,9 +519,13 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	lin_ch2lift->Initialize(lift, chassis, false, ChCoordsys<>(INS_ch2lift, z2x >> rot22.Get_A_quaternion()), ChCoordsys<>(PIS_ch2lift, z2x >> rot11.Get_A_quaternion()));//m2 is the master
 	lin_ch2lift->Set_lin_offset(Vlength(INS_ch2lift - PIS_ch2lift));
 	// temporary piston law for chassis2lift actuator -> it'll be set constant by default and changeable by accessor
-	auto legge = std::make_shared<ChFunction_Ramp>();
-	legge->Set_ang(0.);
-	lin_ch2lift->Set_dist_funct(legge);
+	// Note : it is as displacement law
+	auto leggel1 = std::make_shared<ChFunction_Const>();
+	auto leggel2 = std::make_shared<ChFunction_Ramp>();leggel2->Set_ang(+.05);
+	auto leggel3 = std::make_shared<ChFunction_Const>();
+	auto lift_law = std::make_shared<ChFunction_Sequence>(); lift_law->InsertFunct(leggel1, ta1, 1, true); lift_law->InsertFunct(leggel2, ta2-ta1, 1., true); lift_law->InsertFunct(leggel3, ta3-ta2, 1., true);
+
+	lin_ch2lift->Set_dist_funct(lift_law);
 	system.Add(lin_ch2lift);
 	}
 	// Destructor
@@ -956,13 +975,6 @@ void CreateMechanism(ChSystem& system, std::shared_ptr<ChBody> ground){
 }
 // Create Particles function
 utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
-	// Granular material properties
-	int Id_g = 10000;
-	double rho_g = 2500;
-	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
-	double mass_g = rho_g * vol_g;
-	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 24;// 
 	// Aliquotes
 	double quote_sp = 0.00;//1
 	double quote_bs = 0.10;//2
@@ -1013,9 +1025,8 @@ utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSur
 	m6->setDefaultSize(radius_g);
 
 
-	// Create particles in layers until reaching the desired number of particles
-	ChVector<> hdims(1.5 / 2 - r, 1.5 / 2 - r, 0);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
 	
+
 	for (int il = 0; il < num_layers; il++) {
 		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
 		center.z() += 2 * r;
@@ -1043,13 +1054,14 @@ std::shared_ptr<ChBody> CreateTerrain(ChSystem* system, std::shared_ptr<ChMateri
 
 	container->GetCollisionModel()->ClearModel();
 	// Bottom box
-	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -2 * hthick),
+	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY , hthick), ChVector<>(0, 0, -2 * hthick),
 		ChQuaternion<>(1, 0, 0, 0), true);
 	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
 	//	double spacing = 3.5 * radius_g;
+	int ccc = std::ceil(hdimX/Ra_d/2) + 15;
 
-	for (int ix = -40; ix < 40; ix++) {
-		for (int iy = -40; iy < 40; iy++) {
+	for (int ix = -ccc; ix < ccc; ix++) {
+		for (int iy = -ccc; iy < ccc; iy++) {
 			ChVector<> pos(ix * Ra_d, iy * Ra_d, -Ra_r);
 			utils::AddSphereGeometry(container.get(), Ra_r, pos);
 		}
@@ -1181,33 +1193,43 @@ int main(int argc, char** argv) {
 	// Create the Mechanism
 	// ----------------
 	
-	//CreateMechanism(*system, container);
+	//CreateMechanism(*system, container);// Previous function.Obsolete.
 	MyWheelLoader* mywl = new MyWheelLoader(*system);
 	system->ShowHierarchy(GetLog());
+					// Setting Lifting Function Example
+		auto act = std::dynamic_pointer_cast<ChLinkLinActuator>(mywl->lin_ch2lift);
+		auto fun = std::make_shared<ChFunction_Sine>();
+		fun->Set_freq(2.0); fun->Set_amp(.05);
+		//act->Set_dist_funct(fun);
+		if (act->Get_dist_funct() == fun){ GetLog() << act->Get_dist_funct() << " = " << fun << "--> test passed." << "\n"; }
+		else
+		{
+			GetLog() << "Distance Function Settings : Default\n";
+		}
 				// Setting Lifting Function Example
-	auto act = std::dynamic_pointer_cast<ChLinkLinActuator>(mywl->lin_ch2lift);
-	auto fun = std::make_shared<ChFunction_Sine>();
-	fun->Set_freq(2.0); fun->Set_amp(.05);
-	//act->Set_dist_funct(fun);
-	if (act->Get_dist_funct() == fun){ GetLog() << act->Get_dist_funct() << " = " << fun << "--> test passed." << "\n"; }
-	else
-	{
-		GetLog() << "Test not passed\n";
-	}
-			// Setting Lifting Function Example
 	// CHASSIS-GROUND prismatic+linactuator
 	auto prism_fix2ch = std::make_shared<ChLinkLockPrismatic>();
 	prism_fix2ch->SetName("prismatic_ground2chassis");
 	prism_fix2ch->Initialize(mywl->chassis, container, ChCoordsys<>(mywl->chassis->GetPos(),mywl->z2x));
 	system->AddLink(prism_fix2ch);
-	////////auto lin_fix2ch = std::make_shared<ChLinkLinActuator>();
-	////////prism_fix2ch->SetName("linear_ground2chassis");
-	////////lin_fix2ch->Initialize(chassis, ground, false, ChCoordsys<>(COG_chassis, z2x), ChCoordsys<>(COG_chassis, z2x));//m2 is the master
-	////////lin_fix2ch->Set_lin_offset(Vlength(VNULL));
-	////////system.AddLink(lin_fix2ch);
-	////auto chassis_law = std::make_shared<ChFunction_Ramp>();
-	////chassis_law->Set_ang(10);//it'll act as the chassis speed
-	////lin_fix2ch->Set_dist_funct(chassis_law);
+
+	auto lin_fix2ch = std::make_shared<ChLinkLinActuator>();
+	prism_fix2ch->SetName("linear_ground2chassis");
+	ChQuaternion<> prismrot;
+	prismrot.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(0, 1, 0));
+	lin_fix2ch->Initialize(mywl->chassis, container, false, ChCoordsys<>(mywl->chassis->GetPos(), prismrot), ChCoordsys<>(ChVector<>(-10.0,0.,0.), prismrot));//m2 is the master
+	lin_fix2ch->Set_lin_offset(Vlength(ChVector<>(-10.,0.,0.) - mywl->chassis->GetPos()));// A random far point is chosen s.t. in "reverse gear" motion linear displacement does not turn to negative(i.e. bad behaviour)
+	system->AddLink(lin_fix2ch);
+
+	// Note : it is as displacement law
+	auto legge1 = std::make_shared<ChFunction_Ramp>();
+	legge1->Set_ang(.50);
+	auto legge2 = std::make_shared<ChFunction_Const>();
+	auto legge3 = std::make_shared<ChFunction_Ramp>();
+	legge3->Set_ang(-.50);//Does it take the actual value or that one at the beginning?
+	auto chassis_law = std::make_shared<ChFunction_Sequence>();chassis_law->InsertFunct(legge1, ta1, 1, true);chassis_law->InsertFunct(legge2, ta2-ta1, 1., true);chassis_law->InsertFunct(legge3, ta3-ta2, 1., true);
+
+	lin_fix2ch->Set_dist_funct(chassis_law);
 
 	
 	// ----------------
@@ -1238,7 +1260,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 15.0;
-	double time_step = 1e-5;//1e-4 DEM-P;//n\a DEM--C
+	double time_step = 1e-2;//1e-5 Desktop Working Version
 
 
 	// Initialize simulation frame counter and simulation time
