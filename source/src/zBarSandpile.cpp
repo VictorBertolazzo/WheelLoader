@@ -1260,7 +1260,7 @@ int main(int argc, char** argv) {
 	// ---------------
 
 	double time_end = 15.0;
-	double time_step = 1e-2;//1e-5 Desktop Working Version
+	double time_step = 1e-5;//1e-5 Desktop Working Version
 
 
 	// Initialize simulation frame counter and simulation time
