@@ -49,10 +49,16 @@ using namespace chrono;
 
 
 //////-----------------------------------------GLOBAL VARIABLES------------------------////////////////////////////////////
+// Output directories
+const std::string out_dir = "../DEMP_ZBARSANDPILE";
+const std::string pov_dir = out_dir + "/POVRAY";
+
+bool povray_output = true;
+
 int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
 	bool use_mat_properties = true;
-	bool render = true;
+	bool render = false;
 	bool track_granule = false;
 	bool track_flatten = false;
 	double radius_g = 0.01;// 0.01 feasible dimension
@@ -1065,6 +1071,22 @@ int main(int argc, char** argv) {
 
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
+
+	// --------------------------
+	// Create output directories.
+	// --------------------------
+
+	if (povray_output) {
+		if (ChFileutils::MakeDirectory(out_dir.c_str()) < 0) {
+			std::cout << "Error creating directory " << out_dir << std::endl;
+			return 1;
+		}
+		if (ChFileutils::MakeDirectory(pov_dir.c_str()) < 0) {
+			std::cout << "Error creating directory " << pov_dir << std::endl;
+			return 1;
+		}
+	}
+
 	// --------------------------
 	// Create system and set method-specific solver settings
 	// --------------------------
@@ -1219,12 +1241,31 @@ int main(int argc, char** argv) {
 	double time_step = 1e-5;//1e-4 DEM-P;//n\a DEM--C
 
 
+	// Initialize simulation frame counter and simulation time
+	int render_step_size = 50;
+	int step_number = 0;
+	int render_frame = 0;
+	// Number of simulation steps between two 3D view render frames
+	int render_steps = (int)std::ceil(render_step_size / time_step);
 
+	char filename[100];
 
 
 	while (system->GetChTime() < time_end) {
-
-
+		if (povray_output){
+			if (step_number % render_steps == 0) {
+				// Output render data
+				sprintf(filename, "%s/data_%03d.dat", pov_dir.c_str(), render_frame + 1);
+				utils::WriteShapesPovray(system, filename);
+				std::cout << "Output frame:   " << render_frame << std::endl;
+				std::cout << "Sim frame:      " << step_number << std::endl;
+				std::cout << "Time:           " << time << std::endl;
+				/*std::cout << "             throttle: " << driver.GetThrottle() << " steering: " << driver.GetSteering()
+					<< std::endl;
+				*/std::cout << std::endl;
+				render_frame++;
+			}
+		}
 
 		system->DoStepDynamics(time_step);
 
@@ -1239,6 +1280,8 @@ int main(int argc, char** argv) {
 			}
 		}
 #endif
+		// Increment frame number
+		step_number++;
 	}
 
 	return 0;
