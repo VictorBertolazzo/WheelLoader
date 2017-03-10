@@ -53,7 +53,7 @@ using namespace chrono;
 const std::string out_dir = "../DEMP_ZBARSANDPILE";
 const std::string pov_dir = out_dir + "/POVRAY";
 
-bool povray_output = true;
+bool povray_output = false;
 // Actuator test times : VALUES
 double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double ta5 =12.00;
 // Actuator test times : TESTING IDEA
@@ -61,10 +61,10 @@ double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double
 		// Lift : constant until ta1, then positive displacement(piling) til ta2, at the constant til ta3;
 		// chassis : FWD motion til ta1, stop until ta2, then RWD til ta3;
 
-int num_threads = 8;
+int num_threads = 20;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
 	bool use_mat_properties = true;
-	bool render = false;
+	bool render = true;
 	bool track_granule = false;
 	bool track_flatten = false;
 	double radius_g = 0.01;// 0.01 feasible dimension
@@ -73,14 +73,14 @@ int num_threads = 8;
 
 	double terrainHeight = .01;
 
-	ChVector<> pilepoint(7.00,.0,.0);// Working Desktop Version x=5.50;
+	ChVector<> pilepoint(6.50,.0,.0);// Working Desktop Version x=5.50;
 	ChVector<> terrain_center = pilepoint + ChVector<>(0.00, 0.0, terrainHeight);
 	ChVector<> center = pilepoint + ChVector<>(0.00, 0, terrainHeight + r);
 
 	// Create particles in layers until reaching the desired number of particles
 	// Container dimensions
-	double hdimX = 4.5; // 1.5 Working Desktop Version
-	double hdimY = 4.5; // 1.5 Working Desktop Version 
+	double hdimX = 3.5; // 1.5 Working Desktop Version
+	double hdimY = 3.5; // 1.5 Working Desktop Version 
 	double hdimZ = 0.5;
 	double hthick = 0.25;
 
@@ -99,7 +99,7 @@ int num_threads = 8;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 45;// Working Desktop Version : 24 ;
+	int num_layers = 60;// Working Desktop Version : 24 ;
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
@@ -1250,7 +1250,7 @@ int main(int argc, char** argv) {
 	if (render) {
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
 		gl_window.Initialize(1280, 720, "Sandpile + zBar", system);
-		gl_window.SetCamera(ChVector<>(10, 11, 10), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
+		gl_window.SetCamera(ChVector<>(5, 8, 0), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
 		gl_window.SetRenderMode(opengl::WIREFRAME);
 	}
 #endif
