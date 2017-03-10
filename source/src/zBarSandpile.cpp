@@ -53,7 +53,7 @@ using namespace chrono;
 const std::string out_dir = "../DEMP_ZBARSANDPILE";
 const std::string pov_dir = out_dir + "/POVRAY";
 
-bool povray_output = false;
+bool povray_output = true;
 // Actuator test times : VALUES
 double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double ta5 =12.00;
 // Actuator test times : TESTING IDEA
@@ -64,23 +64,23 @@ double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double
 int num_threads = 8;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
 	bool use_mat_properties = true;
-	bool render = true;
+	bool render = false;
 	bool track_granule = false;
 	bool track_flatten = false;
-	double radius_g = 0.05;// 0.01 feasible dimension
+	double radius_g = 0.01;// 0.01 feasible dimension
 							// 0.01 Working Desktop Version : switched to 5cm to reduce number of bodies
 	double r = 1.01 * radius_g;
 
 	double terrainHeight = .01;
 
-	ChVector<> pilepoint(8.50,.0,.0);// Working Desktop Version x=5.50;
+	ChVector<> pilepoint(7.00,.0,.0);// Working Desktop Version x=5.50;
 	ChVector<> terrain_center = pilepoint + ChVector<>(0.00, 0.0, terrainHeight);
 	ChVector<> center = pilepoint + ChVector<>(0.00, 0, terrainHeight + r);
 
 	// Create particles in layers until reaching the desired number of particles
 	// Container dimensions
-	double hdimX = 7.5; // 1.5 Working Desktop Version
-	double hdimY = 7.5; // 1.5 Working Desktop Version 
+	double hdimX = 4.5; // 1.5 Working Desktop Version
+	double hdimY = 4.5; // 1.5 Working Desktop Version 
 	double hdimZ = 0.5;
 	double hthick = 0.25;
 
@@ -99,7 +99,7 @@ int num_threads = 8;
 	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 	double mass_g = rho_g * vol_g;
 	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 24;// Working Desktop Version : 24 ;
+	int num_layers = 45;// Working Desktop Version : 24 ;
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
