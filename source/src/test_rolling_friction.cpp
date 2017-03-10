@@ -65,7 +65,7 @@ double ComputeKineticEnergy(ChBody* body){
 	double mass = body->GetMass();
 	ChMatrix33<> I = body->GetInertia();
 	ChVector <> xdot = body->GetPos_dt();
-	ChVector <> omega = body->GetWvel_loc();
+	ChVector <> omega = body->GetWvel_par();
 	
 	double kin = mass* xdot.Dot(xdot) + omega.Dot(I.Matr_x_Vect(omega)) ;
 	kin = kin / 2;	return kin;
@@ -83,14 +83,29 @@ using std::endl;
 // --------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
+	double time_step = 1e-4;
+	double time_end = 10.00;
+
+	uint max_iteration_normal = 0;
+	uint max_iteration_sliding = 0;
+	uint max_iteration_spinning = 100;
+	uint max_iteration_bilateral = 0;
+
+
+
 	int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;//DEM
 	bool use_mat_properties = true;
-	bool render = true;
+	bool render = false;
 	bool track_granule = false;
-	double radius_g = 0.005;
+	double radius_g = 0.01;
+	double initial_angspeed = 10;
+	double initial_linspeed = initial_angspeed * radius_g;
+	double density = 2500;
+	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
+	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rollfr = 1.0 * radius_g;
+	double rollfr = 0.1 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -123,8 +138,8 @@ int main(int argc, char** argv) {
 	// ----------------
 
 	// Container dimensions
-	double hdimX = 1.0;
-	double hdimY = 1.0;
+	double hdimX = 5.0;
+	double hdimY = 5.0;
 	double hdimZ = 0.5;
 	double hthick = 0.25;
 
@@ -178,9 +193,9 @@ int main(int argc, char** argv) {
 	case ChMaterialSurfaceBase::DVI: {
 		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;	
-		sys->GetSettings()->solver.max_iteration_normal = 0;
-		sys->GetSettings()->solver.max_iteration_sliding = 0;
-		sys->GetSettings()->solver.max_iteration_spinning = 200;
+		sys->GetSettings()->solver.max_iteration_normal = max_iteration_normal;
+		sys->GetSettings()->solver.max_iteration_sliding = max_iteration_sliding;
+		sys->GetSettings()->solver.max_iteration_spinning = max_iteration_spinning;
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
 		sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;//0.1
@@ -195,7 +210,7 @@ int main(int argc, char** argv) {
 	system->GetSettings()->perform_thread_tuning = false;
 	system->GetSettings()->solver.use_full_inertia_tensor = false;
 	system->GetSettings()->solver.tolerance = 0.1;
-	system->GetSettings()->solver.max_iteration_bilateral = 100;
+	system->GetSettings()->solver.max_iteration_bilateral = max_iteration_bilateral;
 	system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
 	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ); 
 	// Set number of threads
@@ -238,7 +253,6 @@ int main(int argc, char** argv) {
 		mat_ter->SetCohesion(coh_force_terrain);
 
 		mat_ter->SetSpinningFriction(rollfr);
-
 		mat_ter->SetRollingFriction(rollfr);
 
 		material_terrain = mat_ter;
@@ -266,14 +280,15 @@ int main(int argc, char** argv) {
 
 	// Create a Sphere
 	auto ball = std::shared_ptr<ChBody>(system->NewBody());
-	system->AddBody(ball);
+	system->AddBody(ball);			// FLAG
 	ball->SetIdentifier(+1);
-	ball->SetDensity(rho_g);
+	ball->SetMass(mass);
+	ball->SetInertiaXX(inertia*ChVector<>(1, 1, 1));
 	ball->SetBodyFixed(false);
 	ball->SetCollide(true);
-	ball->SetPos(ChVector<>(.0, .0, 2*radius_g + 1.0));
-	ball->SetPos_dt(ChVector<>(.5, 0., 0.));
-	//ball->SetWvel_par(ChVector<>(.0, 1.0, .0));
+	ball->SetPos(ChVector<>(.0, .0, 1*radius_g ));
+	ball->SetPos_dt(ChVector<>(initial_linspeed, 0., 0.));
+	ball->SetWvel_par(ChVector<>(.0, initial_angspeed, .0));
 	ball->SetMaterialSurface(material_terrain);
 	ball->GetCollisionModel()->ClearModel();
 	// Bottom box
@@ -281,7 +296,7 @@ int main(int argc, char** argv) {
 		ChQuaternion<>(1, 0, 0, 0), true);
 	ball->GetCollisionModel()->BuildModel();
 
-	GetLog()<< "rolling : " <<ball->GetMaterialSurface()->GetRollingFriction()<<"\n";
+	GetLog()<< "ball rolling : " <<ball->GetMaterialSurface()->GetRollingFriction()<<"\n";
 	//		
 	
 	// Create the sampler
@@ -289,9 +304,9 @@ int main(int argc, char** argv) {
 	// SPHERES
 	std::shared_ptr<utils::MixtureIngredient> m0 = gen.AddMixtureIngredient(utils::SPHERE, 1.0);
 	m0->setDefaultMaterial(material_terrain);
-	m0->setDefaultDensity(rho_g);
+	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ball->GetPos(), 0.030, 3*radius_g);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
 
 
 	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
@@ -306,8 +321,10 @@ int main(int argc, char** argv) {
 	}
 	particlelist.erase(particlelist.begin()); // delete terrain body from the list
 	//particlelist.erase(particlelist.begin()); // delete torus body from the list
+	int jiter = std::ceil(particlelist.size() / 2);
+	double rgen = particlelist[jiter].get()->GetMaterialSurface()->GetRollingFriction();
+	GetLog() << "gen rolling  : " << rgen << "\n";
 
-	
 
 	
 #ifdef CHRONO_OPENGL
@@ -327,8 +344,6 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 1.0025;
-	double time_step = 1e-3;//1.5e-5;
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
@@ -354,12 +369,13 @@ int main(int argc, char** argv) {
 		system->DoStepDynamics(time_step);
 		sim_frame++;
 		auto list = system->Get_bodylist();
-		//		for (auto body = list->begin(); body != list->end(); ++body) {
-		for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+				for (auto body = list->begin(); body != list->end(); ++body) {
+		//for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
 			auto mbody = std::shared_ptr<ChBody>(*body);
 			avkinenergy += ComputeKineticEnergy(mbody.get());
 		}
-		avkinenergy /= particlelist.size();
+//		avkinenergy /= particlelist.size();
+		avkinenergy /= list->size();
 		mfun.AddPoint(system->GetChTime(), avkinenergy);
 
 		cum_sim_time += system->GetTimerStep();
@@ -374,8 +390,7 @@ int main(int argc, char** argv) {
 			opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
 			if (gl_window.Active()) {
 				gl_window.Render();
-				//std::cout << ball->GetPos().z() <<std::endl;
-			}
+					}
 			else {
 				return 1;
 			}
