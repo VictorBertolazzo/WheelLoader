@@ -1,23 +1,7 @@
-// =============================================================================
-// PROJECT CHRONO - http://projectchrono.org
-//
-// Copyright (c) 2014 projectchrono.org
-// All right reserved.
-//
-// Use of this source code is governed by a BSD-style license that can be found
-// in the LICENSE file at the top level of the distribution and at
-// http://projectchrono.org/license-chrono.txt.
-//
-// =============================================================================
-// Author: Radu Serban
-// =============================================================================
-//
-// ChronoParallel test program for settling process of granular material.
-//
-// The global reference frame has Z up.
-// All units SI (CGS, i.e., centimeter - gram - second)
-//
-// =============================================================================
+// Victor Bertolazzo
+// Collection of all test granular codes.Switching from one to another can be done via case function.
+// For reference original files are kept in the repo, activate them disabling the comment in CmakeLists.tex file
+// ================================================================================================================
 
 #include <cmath>
 #include <iostream>
@@ -34,17 +18,106 @@
 #include "chrono/utils/ChUtilsGenerators.h"
 #include "chrono/utils/ChUtilsInputOutput.h"
 
+#include "chrono/collision/ChCCollisionUtils.h"
+
+
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/solver/ChIterativeSolverParallel.h"
+
+#include "chrono_postprocess/ChGnuPlot.h"
+
+
 
 #ifdef CHRONO_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 
+enum TestType {LAYER, FUNNEL, DROP, CASCADE};
+TestType workcase = TestType::CASCADE;
 using namespace chrono;
+using namespace postprocess;
 
 // --------------------------------------------------------------------------
 
+
+const std::string out_dir = "../";
+const std::string pov_dir = out_dir + "/POVRAY";
+int out_fps = 60;
+
+using std::cout;
+using std::endl;
+
+int num_threads = 40;
+ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
+// PovRay Output
+bool povray_output = false;
+// Material
+bool use_mat_properties = true;
+// Render 
+bool render = true;
+// Tracking Granule
+bool track_granule = false;
+// Roughness
+bool roughness = false;
+// --------------------------------------------------------------------------
+double radius_g = 0.01;
+double rolling_friction = 0.05 * radius_g;
+// --------------------------------------------------------------------------
+double r = 1.01 * radius_g;
+
+// Container dimensions
+double hdimX = 1.0;
+double hdimY = 1.0;
+double hdimZ = 0.5;
+double hthick = 0.25;
+
+// Granular material properties
+int Id_g = 10000;
+double rho_g = 2500;
+double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
+double mass_g = rho_g * vol_g;
+ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
+int num_layers = 22;
+
+// Terrain contact properties
+// Terrain contact properties---Default Ones are commented out.
+float friction_terrain = 0.7f;// 
+float restitution_terrain = 0.0f;
+float Y_terrain = 8e4f;
+float nu_terrain = 0.3f;
+float kn_terrain = 1.0e4f;// 1.0e7f;
+float gn_terrain = 1.0e2f;
+float kt_terrain = 2.86e3f;// 2.86e6f;
+float gt_terrain = 1.0e2f;
+float coh_pressure_terrain = 1e2f;// 0e3f;
+float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
+
+//// Estimates for number of bins for broad-phase
+//int factor = 2;
+//int binsX = (int)std::ceil(hdimX / radius_g) / factor;
+//int binsY = (int)std::ceil(hdimY / radius_g) / factor;
+//int binsZ = 1;
+int binsX = 20;
+int binsY = 20;
+int binsZ = 10;
+// -------------------------
+double Ra_d = 5.0*radius_g;//Distance from centers of particles.
+double Ra_r = 3.0*radius_g;//Default Size of particles.
+
+
+
+// ---------------------------FUNCTIONS--------------------------------
+double ComputeKineticEnergy(ChBody* body){
+
+	double mass = body->GetMass();
+	ChMatrix33<> I = body->GetInertia();
+	ChVector <> xdot = body->GetPos_dt();
+	ChVector <> omega = body->GetWvel_par();
+
+	double kin = mass* xdot.Dot(xdot) + omega.Dot(I.Matr_x_Vect(omega));
+	kin = kin / 2;	return kin;
+
+}
 void TimingHeader() {
 	printf("    TIME    |");
 	printf("    STEP |");
@@ -75,28 +148,164 @@ void TimingOutput(chrono::ChSystem* mSys) {
 	printf("   %8.5f | %7.4f | %7.4f | %7.4f | %7.4f | %7.4f | %7d | %7d | %7d | %7.4f |\n", TIME, STEP, BROD, NARR,
 		SOLVER, UPDT, BODS, CNTC, REQ_ITS);
 }
+// Funnel utility Function
+void AddWall(ChVector<> lower, ChVector<> upper, std::shared_ptr<ChBody> body, double r) {
 
-// PovRay Output
-bool povray_output = false;
-const std::string out_dir = "../";
-const std::string pov_dir = out_dir + "/POVRAY";
-int out_fps = 60;
+	std::vector<ChVector<double>> cloud;
+	double th = 0.5*r;// or halve an input
+	// if statement only on lower 
+	if (lower.x() != 0. && lower.y() == 0.){
+		double ss = std::abs(lower.x());
 
-using std::cout;
-using std::endl;
-// --------------------------------------------------------------------------
+		cloud.push_back(lower + ChVector<>(-th, ss, 0.));
+		cloud.push_back(lower + ChVector<>(+th, ss, 0.));
+		cloud.push_back(lower + ChVector<>(-th, -ss, 0.));
+		cloud.push_back(lower + ChVector<>(+th, -ss, 0.));
+		double uu = std::abs(upper.x());
+		cloud.push_back(upper + ChVector<>(-th, uu, 0.));
+		cloud.push_back(upper + ChVector<>(+th, uu, 0.));
+		cloud.push_back(upper + ChVector<>(-th, -uu, 0.));
+		cloud.push_back(upper + ChVector<>(+th, -uu, 0.));
 
+	}
+
+	if (lower.x() == 0. && lower.y() != 0.){
+		double ss = std::abs(lower.y());
+		cloud.push_back(lower + ChVector<>(ss, -th, 0.));
+		cloud.push_back(lower + ChVector<>(ss, +th, 0.));
+		cloud.push_back(lower + ChVector<>(-ss, -th, 0.));
+		cloud.push_back(lower + ChVector<>(-ss, +th, 0.));
+		double uu = std::abs(upper.y());
+		cloud.push_back(upper + ChVector<>(uu, -th, 0.));
+		cloud.push_back(upper + ChVector<>(uu, +th, 0.));
+		cloud.push_back(upper + ChVector<>(-uu, -th, 0.));
+		cloud.push_back(upper + ChVector<>(-uu, +th, 0.));
+	}
+
+	// Add a check on cloud.size()==8;
+
+
+	body->GetCollisionModel()->AddConvexHull(cloud, ChVector<>(0, 0, 0), QUNIT);
+	//body->GetCollisionModel()->BuildModel();
+
+	auto shape = std::make_shared<ChTriangleMeshShape>();
+	collision::ChConvexHullLibraryWrapper lh;
+	lh.ComputeHull(cloud, shape->GetMesh());
+	body->AddAsset(shape);
+
+	body->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
+}
+// Particle Runtime Generation	
+int SpawnParticles(utils::Generator* gen) {
+	double dist = 2 * 0.99 * radius_g;
+
+	////gen->createObjectsBox(utils::POISSON_DISK,
+	////                     dist,
+	////                     ChVector<>(9, 0, 3),
+	////                     ChVector<>(0, 1, 0.5),
+	////                     ChVector<>(-initVel, 0, 0));
+	gen->createObjectsCylinderZ(utils::POISSON_DISK, dist, ChVector<>(0, 0, 0.25), 0.030f, 0, ChVector<>(0, 0, 0));
+	std::cout << "  total bodies: " << gen->getTotalNumBodies() << std::endl;
+
+	return gen->getTotalNumBodies();
+}
+// Funnel Generation , case::FUNNEL
+void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
+	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
+	system->AddBody(funnel);
+	funnel->SetIdentifier(-2);
+	funnel->SetPos(ChVector<>(0., 0., 2 * radius_g));
+	funnel->SetMass(1);
+	funnel->SetBodyFixed(false);
+	funnel->SetMaterialSurface(material_terrain);
+	switch (method) {
+		// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
+	case ChMaterialSurfaceBase::DEM: {
+										 funnel->GetMaterialSurfaceDEM()->SetFriction(.1f);
+										 break;
+	}
+	case ChMaterialSurfaceBase::DVI: {
+										 funnel->GetMaterialSurface()->SetFriction(.1f);
+										 break;
+	}
+	}
+	funnel->SetCollide(true);
+	funnel->GetCollisionModel()->ClearModel();
+	// OpenGL does not accept more than ONE visualization shape per body
+	double half_low_size = 6 * radius_g;
+	double half_upp_size = 20 * radius_g;
+	double base2base_height = 100 * radius_g;
+	AddWall(ChVector<>(half_low_size, .0, .0), ChVector<>(half_upp_size, .0, base2base_height), funnel, radius_g);
+	AddWall(ChVector<>(0., half_low_size, .0), ChVector<>(0., half_upp_size, base2base_height), funnel, radius_g);
+	AddWall(ChVector<>(-half_low_size, .0, .0), ChVector<>(-half_upp_size, .0, base2base_height), funnel, radius_g);
+	AddWall(ChVector<>(0., -half_low_size, .0), ChVector<>(0., -half_upp_size, base2base_height), funnel, radius_g);
+	funnel->GetCollisionModel()->BuildModel();
+
+	//----------------
+	// Create the Funnel Movement: this should be a constant velocity trajectory in z direction
+	// 
+	// Linear actuator btw the container and the funnel, it simulates the raising of the latter which must be always closely over the sand heap top.
+	auto cont2fun = std::make_shared<ChLinkLockPrismatic>();
+	cont2fun->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
+	system->AddLink(cont2fun);
+	auto container2funnel = std::make_shared<ChLinkLinActuator>();
+	container2funnel->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
+	auto funnel_law = std::make_shared<ChFunction_Ramp>();
+	funnel_law->Set_ang(3.6*radius_g);// velocity of the funnel(10X test for simulation purposes).
+	container2funnel->Set_lin_offset(Vlength(container->GetPos() - funnel->GetPos()));
+	container2funnel->Set_dist_funct(funnel_law);
+	system->AddLink(container2funnel);
+
+}
+// Hollowed Cylinder Generation , case::CASCADE
+void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurfaceBase> material_terrain, double time_hold){	// Create TUBE body
+	auto tube = std::shared_ptr<ChBody>(system->NewBody());
+	system->AddBody(tube);
+	tube->SetIdentifier(-2);
+	tube->SetPos_dt(ChVector<>(.0, .0, 0.0));// Initial Value
+	tube->SetMass(1.0);
+	tube->SetBodyFixed(false);// true + actuator yields two bodies explode
+	tube->SetCollide(true);
+	tube->SetMaterialSurface(material_terrain);
+	tube->GetCollisionModel()->ClearModel();
+	ChQuaternion<> qtube;
+	qtube.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(1, 0, 0));
+	tube->SetPos(ChVector<>(0.0, .0, .0));
+	tube->SetRot(qtube);
+	for (int i = 0; i < 15; i++){
+		utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 5 * 20, 360, ChVector<>(0, 2 * i * 0.005, 0.), ChQuaternion<>(1.0, 0., 0., .0), true);
+	}
+	//utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 20,360,ChVector<>(0,0,0),ChQuaternion<>(1.0,.0,.0,.0),true);
+	tube->GetCollisionModel()->BuildModel();
+
+	ChQuaternion<> z2z;
+	//z2z.Q_from_AngAxis(0.0, ChVector<>(0, 1, 0));
+	// Create a prismatic actuator btw CONTAINER and TUBE
+	auto prismCT = std::make_shared<ChLinkLockPrismatic>();
+	prismCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), z2z));
+	system->AddLink(prismCT);
+	auto linCT = std::make_shared<ChLinkLinActuator>();
+	linCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), z2z));//m2 is the master
+	linCT->Set_lin_offset(0.0);
+	system->AddLink(linCT);
+	auto legge1 = std::make_shared<ChFunction_Const>();
+	legge1->Set_yconst(0.0);
+	auto legge2 = std::make_shared<ChFunction_Ramp>();
+	legge2->Set_ang(0.015);
+	auto sequence = std::make_shared<ChFunction_Sequence>();
+	sequence->InsertFunct(legge1, time_hold, 1.0, true);
+	sequence->InsertFunct(legge2, 300, 1.0, true);
+
+
+	linCT->Set_dist_funct(sequence);
+}
+// ---------------------------FUNCTIONS--------------------------------
 int main(int argc, char** argv) {
-	int num_threads = 4;
-	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
-	bool use_mat_properties = true;
-	bool render = true;
-	bool track_granule = false;
-
-	// --------------------------
+	uint max_iteration_normal = 0;
+	uint max_iteration_sliding = 0;
+	uint max_iteration_spinning = 100;
+	uint max_iteration_bilateral = 0;
 	// Create output directories.
-	// --------------------------
-
 	if (povray_output) {
 		if (ChFileutils::MakeDirectory(out_dir.c_str()) < 0) {
 			cout << "Error creating directory " << out_dir << endl;
@@ -107,88 +316,39 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 	}
-
-
-
 	// Get number of threads from arguments (if specified)
 	if (argc > 1) {
 		num_threads = std::stoi(argv[1]);
 	}
-
 	std::cout << "Requested number of threads: " << num_threads << std::endl;
-
-	// ----------------
 	// Model parameters
-	// ----------------
-
-	// Container dimensions
-	double hdimX = 1.0;
-	double hdimY = 1.0;
-	double hdimZ = 0.5;
-	double hthick = 0.25;
-
-	// Granular material properties
-	double radius_g = 0.01;
-	int Id_g = 10000;
-	double rho_g = 2500;
-	double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
-	double mass_g = rho_g * vol_g;
-	ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-	int num_layers = 22;
-
-	// Terrain contact properties
-	float friction_terrain = 0.9f;
-	float restitution_terrain = 0.0f;
-	float Y_terrain = 8e5f;
-	float nu_terrain = 0.3f;
-	float kn_terrain = 1.0e7f;
-	float gn_terrain = 1.0e3f;
-	float kt_terrain = 2.86e6f;
-	float gt_terrain = 1.0e3f;
-	float coh_pressure_terrain = 0e3f;
-	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
-
-	// Estimates for number of bins for broad-phase
-	int factor = 2;
-	int binsX = (int)std::ceil(hdimX / radius_g) / factor;
-	int binsY = (int)std::ceil(hdimY / radius_g) / factor;
-	int binsZ = 1;
-
-    binsX = 20;
-    binsY = 20;
-    binsZ = 10;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
-
-	// --------------------------
 	// Create the parallel system
-	// --------------------------
-
-	// Create system and set method-specific solver settings
 	chrono::ChSystemParallel* system;
-
+	// Create system and set method-specific solver settings
 	switch (method) {
 	case ChMaterialSurfaceBase::DEM: {
-		ChSystemParallelDEM* sys = new ChSystemParallelDEM;
-		sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
-		sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
-		sys->GetSettings()->solver.use_material_properties = use_mat_properties;
-		system = sys;
+										 ChSystemParallelDEM* sys = new ChSystemParallelDEM;
+										 sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
+										 sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
+										 sys->GetSettings()->solver.use_material_properties = use_mat_properties;
+										 system = sys;
 
-		break;
+										 break;
 	}
 	case ChMaterialSurfaceBase::DVI: {
-		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
-		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
-		sys->GetSettings()->solver.max_iteration_normal = 0;
-		sys->GetSettings()->solver.max_iteration_sliding = 200;
-		sys->GetSettings()->solver.max_iteration_spinning = 0;
-		sys->GetSettings()->solver.alpha = 0;
-		sys->GetSettings()->solver.contact_recovery_speed = -1;
-		sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
-		sys->ChangeSolverType(SolverType::APGD);
-		system = sys;
+										 ChSystemParallelDVI* sys = new ChSystemParallelDVI;
+										 sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
+										 sys->GetSettings()->solver.max_iteration_normal = 0;
+										 sys->GetSettings()->solver.max_iteration_sliding = 200;
+										 sys->GetSettings()->solver.max_iteration_spinning = 0;
+										 sys->GetSettings()->solver.alpha = 0;
+										 sys->GetSettings()->solver.contact_recovery_speed = -1;
+										 sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
+										 sys->ChangeSolverType(SolverType::APGD);
+										 system = sys;
 
-		break;
+										 break;
 	}
 	}
 
@@ -209,43 +369,45 @@ int main(int argc, char** argv) {
 #pragma omp master
 	{ std::cout << "Actual number of OpenMP threads: " << omp_get_num_threads() << std::endl; }
 
-	// ---------------------
-	// Create terrain bodies
-	// ---------------------
+	// -----------------------------------------------------------------------------------
+	// ---------------------------------Create terrain bodies-----------------------------
+	// -----------------------------------------------------------------------------------
 
-	// Create contact material for terrain
-	std::shared_ptr<ChMaterialSurfaceBase> material_terrain;
+			// Create contact material for terrain
+			std::shared_ptr<ChMaterialSurfaceBase> material_terrain;
 
 	switch (method) {
 	case ChMaterialSurfaceBase::DEM: {
-		auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
-		mat_ter->SetFriction(friction_terrain);
-		mat_ter->SetRestitution(restitution_terrain);
-		mat_ter->SetYoungModulus(Y_terrain);
-		mat_ter->SetPoissonRatio(nu_terrain);
-		mat_ter->SetAdhesion(coh_force_terrain);
-		mat_ter->SetKn(kn_terrain);
-		mat_ter->SetGn(gn_terrain);
-		mat_ter->SetKt(kt_terrain);
-		mat_ter->SetGt(gt_terrain);
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+										 mat_ter->SetFriction(friction_terrain);
+										 mat_ter->SetRestitution(restitution_terrain);
+										 mat_ter->SetYoungModulus(Y_terrain);
+										 mat_ter->SetPoissonRatio(nu_terrain);
+										 mat_ter->SetAdhesion(coh_force_terrain);
+										 mat_ter->SetKn(kn_terrain);
+										 mat_ter->SetGn(gn_terrain);
+										 mat_ter->SetKt(kt_terrain);
+										 mat_ter->SetGt(gt_terrain);
 
-		material_terrain = mat_ter;
+										 material_terrain = mat_ter;
 
-		break;
+										 break;
 	}
 	case ChMaterialSurfaceBase::DVI: {
-		auto mat_ter = std::make_shared<ChMaterialSurface>();
-		mat_ter->SetFriction(friction_terrain);
-		mat_ter->SetRestitution(restitution_terrain);
-		mat_ter->SetCohesion(coh_force_terrain);
+										 auto mat_ter = std::make_shared<ChMaterialSurface>();
+										 mat_ter->SetFriction(friction_terrain);
+										 mat_ter->SetRestitution(restitution_terrain);
+										 mat_ter->SetCohesion(coh_force_terrain);
+										 mat_ter->SetSpinningFriction(rolling_friction);
+										 mat_ter->SetRollingFriction(rolling_friction);
 
-		material_terrain = mat_ter;
+										 material_terrain = mat_ter;
 
-		break;
+										 break;
 	}
 	}
 
-	// Create container body
+						// Create container body
 	auto container = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(container);
 	container->SetIdentifier(-1);
@@ -272,33 +434,96 @@ int main(int argc, char** argv) {
 		ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), false);
 	container->GetCollisionModel()->BuildModel();
 
-	// ----------------
-	// Create particles
-	// ----------------
+	if (roughness) {
+	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
+	//	double spacing = 3.5 * radius_g;
 
-	// Create a particle generator and a mixture entirely made out of spheres
-	utils::Generator gen(system);
-	std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::BISPHERE, 1);
-	m1->setDefaultMaterial(material_terrain);
-	m1->setDefaultDensity(rho_g);
-	m1->setDefaultSize(radius_g);
-	gen.setBodyIdentifier(Id_g);
-
-	// Create particles in layers until reaching the desired number of particles
-	double r = 1.01 * radius_g;
-	ChVector<> hdims(hdimX/2 - r, hdimY/2 - r, 0);
-	ChVector<> center(0, 0, 2 * r);
-
-	for (int il = 0; il < num_layers; il++) {
-		gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
-		center.z() += 2 * r;
-		// shrink uniformly the upper layer
-		hdims.x() -= 2 * r;
-		hdims.y() -= 2 * r;
-		// move the center abscissa by a 1*r 
-		center.x() += r * pow(-1, il);
-
+	for (int ix = -40; ix < 40; ix++) {
+		for (int iy = -40; iy < 40; iy++) {
+			ChVector<> pos(ix * Ra_d, iy * Ra_d, 0.0);
+			utils::AddSphereGeometry(container.get(), Ra_r, pos);
+		}
 	}
+	container->GetCollisionModel()->BuildModel();
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------------- //
+	// ------------------------------------------------Create particles------------------------------------------------------- //
+	// ----------------------------------------------------------------------------------------------------------------------- //
+
+	// // 
+		// Create a particle generator and a mixture entirely made out of spheres
+		utils::Generator gen(system);
+		std::shared_ptr<utils::MixtureIngredient> m1 = gen.AddMixtureIngredient(utils::SPHERE, 1);
+		m1->setDefaultMaterial(material_terrain);
+		m1->setDefaultDensity(rho_g);
+		m1->setDefaultSize(radius_g);
+		gen.setBodyIdentifier(Id_g);
+
+
+
+	switch (workcase) {
+	case TestType::LAYER: {			
+								  // Create particles in layers until reaching the desired number of particles
+								  ChVector<> hdims(hdimX / 2 - r, hdimY / 2 - r, 0);
+								  ChVector<> center(0, 0, 2 * r);
+
+								  for (int il = 0; il < num_layers; il++) {
+								  gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
+								  center.z() += 2 * r;
+								  // shrink uniformly the upper layer
+								  hdims.x() -= 2 * r;
+								  hdims.y() -= 2 * r;
+								  // move the center abscissa by a 1*r 
+								  center.x() += r * pow(-1, il);
+	}
+
+		break;
+								}
+		case TestType::FUNNEL: {
+								   ChVector<> hdims(10 * r - r, 10 * r - r, 10 * r);
+								   ChVector<> center(0., 0., 50 * r + 25*r);//10r is the height of the funnel.
+
+								   CreateFunnel(system, container, material_terrain);
+								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);
+
+								  break;
+		}
+		case TestType::DROP: {		// 1200 bodies instead of 1300, too high 
+								 // Create particles in layers until reaching the desired number of particles
+								 ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//
+								 ChVector<> center(0, 0, 3.500);//.800
+
+								 gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.030, center.z() - .05);
+								 unsigned int num_particles = gen.getTotalNumBodies();
+								 std::cout << "Generated particles:  " << num_particles << std::endl;
+
+								  break;
+		}
+		case TestType::CASCADE: {  // only 126 bodies instead of 1300
+									double time_hold = 1.0;
+									CreateTube(system, container, material_terrain, time_hold);
+
+									// Create particles in layers until reaching the desired number of particles
+									double r = 1.01 * radius_g;
+									ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
+									ChVector<> center(0, 0, .330);//.800
+
+									gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, .070 / 2, center.z() - .05);
+									unsigned int num_particles = gen.getTotalNumBodies();
+									std::cout << "Generated particles:  " << num_particles << std::endl;
+
+								  break;
+		}
+
+}
+
+
+
+
+
+
+	
 
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
@@ -340,7 +565,7 @@ int main(int argc, char** argv) {
 	// Simulate system
 	// ---------------
 
-	double time_end = 5.00;
+	double time_end = .50;
 	double time_step = 1e-4;
 
 	double cum_sim_time = 0;
@@ -359,9 +584,35 @@ int main(int argc, char** argv) {
 	int out_frame = 0;
 	int next_out_frame = 0;
 
+	ChFunction_Recorder mfun;
+	ChFunction_Recorder zfun;
+
+	double avkinenergy = 0.;
+	
+	
+
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
 
+		auto list = system->Get_bodylist();
+		std::vector<double> zs;
+		for (auto body = list->begin(); body != list->end(); ++body) {
+			//for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+			auto mbody = std::shared_ptr<ChBody>(*body);
+			if (mbody->GetIdentifier() == -1 || mbody->GetIdentifier() == -2) {
+			}
+			else{
+				avkinenergy += ComputeKineticEnergy(mbody.get());
+				zs.push_back(mbody->GetPos().z());
+			}
+
+
+		}
+		//		avkinenergy /= particlelist.size();
+		avkinenergy /= list->size();
+		mfun.AddPoint(system->GetChTime(), avkinenergy);
+		auto biggest = std::max_element(std::begin(zs), std::end(zs));
+		zfun.AddPoint(system->GetChTime(), *biggest);
 		//TimingOutput(system);
 
 		cum_sim_time += system->GetTimerStep();
@@ -392,8 +643,17 @@ int main(int argc, char** argv) {
 			}
 		}
 #endif
+		
 	}
-
+	// Gnuplot
+	ChGnuPlot mplot("__tmp_gnuplot_4.gpl");
+	mplot.SetGrid();
+	mplot.Plot(mfun, "Kinetic Energy of the system", " with lines lt -1 lc rgb'#00AAEE' ");
+	//
+	ChGnuPlot zplot("__tmp_gnuplot_5.gpl");
+	zplot.SetGrid();
+	zplot.Plot(zfun, "Maximum particle height", " with lines lt -1 lc rgb'#00AAEE' ");
+	//
 	std::cout << std::endl;
 	std::cout << "Simulation time: " << cum_sim_time << std::endl;
 	std::cout << "    Broadphase:  " << cum_broad_time << std::endl;
@@ -401,7 +661,7 @@ int main(int argc, char** argv) {
 	std::cout << "    Solver:      " << cum_solver_time << std::endl;
 	std::cout << "    Update:      " << cum_update_time << std::endl;
 	std::cout << std::endl;
-
+	
 
 	return 0;
 }
