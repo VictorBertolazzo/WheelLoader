@@ -84,7 +84,7 @@ using std::endl;
 
 int main(int argc, char** argv) {
 	double time_step = 1e-4;
-	double time_end = 10.00;
+	double time_end = 2.00;
 
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
 	int num_threads = 4;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;//DEM
 	bool use_mat_properties = true;
-	bool render = false;
+	bool render = true;
 	bool track_granule = false;
 	double radius_g = 0.01;
 	double initial_angspeed = 10;
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rollfr = 0.1 * radius_g;
+	double rollfr = 0.05 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -280,7 +280,7 @@ int main(int argc, char** argv) {
 
 	// Create a Sphere
 	auto ball = std::shared_ptr<ChBody>(system->NewBody());
-	system->AddBody(ball);			// FLAG
+	//system->AddBody(ball);			// FLAG
 	ball->SetIdentifier(+1);
 	ball->SetMass(mass);
 	ball->SetInertiaXX(inertia*ChVector<>(1, 1, 1));
