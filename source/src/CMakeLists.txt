@@ -1,11 +1,15 @@
 
 SET(MODELS
-  cascading_packing_condition
+#  cascading_packing_condition
 #  demo_IRR_fel
+#  demo_PAR_friction
+  hydraulic_force
+  iArmlinkage
   test_granular_PAR
-  test_granular_PAR_cyl
-  test_granular_PAR_funnel
-  test_granular_PAR_layer
+#  test_granular_PAR_cyl
+#  test_granular_PAR_funnel
+#  test_granular_PAR_layer
+  test_HYDR_actuator
   test_mesh
   test_normal
   test_normal_PAR
