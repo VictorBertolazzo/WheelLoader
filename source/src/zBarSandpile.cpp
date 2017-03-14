@@ -18,7 +18,11 @@
 #include <numeric>
 #include <functional>
 #include <algorithm>
-
+ // 03/11/2017 -->(10 days in euler37)
+ // play with bins per axis 
+ // replace ellipsoids with spheres
+ // understand the major player(narrow,broad,solver)
+ // try to relax time_step
 #include "chrono/ChConfig.h"
 #include "chrono/core/ChFileutils.h"
 #include "chrono/core/ChTimer.h"
@@ -53,7 +57,7 @@ using namespace chrono;
 const std::string out_dir = "../DEMP_ZBARSANDPILE";
 const std::string pov_dir = out_dir + "/POVRAY";
 
-bool povray_output = true;
+bool povray_output = false;
 // Actuator test times : VALUES
 double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double ta5 =12.00;
 // Actuator test times : TESTING IDEA
@@ -61,7 +65,7 @@ double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double
 		// Lift : constant until ta1, then positive displacement(piling) til ta2, at the constant til ta3;
 		// chassis : FWD motion til ta1, stop until ta2, then RWD til ta3;
 
-int num_threads = 20;
+int num_threads = 40;
 	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
 	bool use_mat_properties = true;
 	bool render = false;
@@ -73,6 +77,10 @@ int num_threads = 20;
 	int num_layers = 50;// Working Desktop Version : 24 ;
 
 	double terrainHeight = .01;
+	// BroadPhase Parameters
+	int binsX = 30;
+	int binsY = 30;
+	int binsZ = 30;
 
 	ChVector<> pilepoint(6.50,.0,.0);// Working Desktop Version x=5.50;
 	ChVector<> terrain_center = pilepoint + ChVector<>(0.00, 0.0, terrainHeight);
@@ -119,9 +127,6 @@ int num_threads = 20;
 	// int binsY = (int)std::ceil(hdimY / radius_g) / factor;
 	// int binsZ = 1;
 
-	int binsX = 30;
-	int binsY = 30;
-	int binsZ = 30;
 //////-----------------------------------------GLOBAL VARIABLES------------------------////////////////////////////////////
 
 // ------------------CLASSES----------------------------------------------
@@ -976,9 +981,9 @@ void CreateMechanism(ChSystem& system, std::shared_ptr<ChBody> ground){
 // Create Particles function
 utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
 	// Aliquotes
-	double quote_sp = 0.00;//1
+	double quote_sp = 0.35;//1//.00
 	double quote_bs = 0.10;//2
-	double quote_el = 0.35;//3
+	double quote_el = 0.00;//3//.35
 	double quote_cs = 0.00;//4
 	double quote_bx = 0.40;//5
 	double quote_rc = 0.00;//6
@@ -1288,7 +1293,7 @@ int main(int argc, char** argv) {
 				render_frame++;
 			}
 		}
-		std::cout << system->GetChTime() << std::endl;
+		//std::cout << system->GetChTime() << std::endl;
 		system->DoStepDynamics(time_step);
 
 #ifdef CHRONO_OPENGL
