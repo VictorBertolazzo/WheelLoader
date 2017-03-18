@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rollfr = 0.05 * radius_g;
+	double rollfr = 0.005 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -170,7 +170,7 @@ int main(int argc, char** argv) {
 
     binsX = 10;
     binsY = 10;
-    binsZ = 20;
+    binsZ = 10;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
 		sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;//0.1
-		sys->ChangeSolverType(SolverType::APGD);
+		sys->ChangeSolverType(SolverType::BB);
 		system = sys;
 
 		break;
@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
 	system->SetParallelThreadNumber(num_threads);
 	CHOMPfunctions::SetNumThreads(num_threads);
 
-	// Sanity check: print number of threads in a parallel region
+	 //Sanity check: print number of threads in a parallel region
 #pragma omp parallel
 #pragma omp master
 	{ std::cout << "Actual number of OpenMP threads: " << omp_get_num_threads() << std::endl; }
@@ -269,7 +269,11 @@ int main(int argc, char** argv) {
 	container->SetPos(ChVector<>(0., 0., -10 * radius_g));
 	container->SetBodyFixed(true);
 	container->SetCollide(true);
-	container->SetMaterialSurface(material_terrain);
+	// it's not the problem for using all iterations
+	//container->SetMaterialSurface(material_terrain);
+	container->GetMaterialSurface()->SetFriction(friction_terrain);
+	container->GetMaterialSurface()->SetRollingFriction(rollfr);
+	container->GetMaterialSurface()->SetSpinningFriction(rollfr);
 	container->GetCollisionModel()->ClearModel();
 	
 	// Bottom box
@@ -280,7 +284,7 @@ int main(int argc, char** argv) {
 
 	// Create a Sphere
 	auto ball = std::shared_ptr<ChBody>(system->NewBody());
-	//system->AddBody(ball);			// FLAG
+	system->AddBody(ball);			// FLAG
 	ball->SetIdentifier(+1);
 	ball->SetMass(mass);
 	ball->SetInertiaXX(inertia*ChVector<>(1, 1, 1));
@@ -289,8 +293,14 @@ int main(int argc, char** argv) {
 	ball->SetPos(ChVector<>(.0, .0, 1*radius_g ));
 	ball->SetPos_dt(ChVector<>(initial_linspeed, 0., 0.));
 	ball->SetWvel_par(ChVector<>(.0, initial_angspeed, .0));
-	ball->SetMaterialSurface(material_terrain);
+	//ball->SetMaterialSurface(material_terrain);
 	ball->GetCollisionModel()->ClearModel();
+
+	ball->GetMaterialSurface()->SetFriction(friction_terrain);
+	ball->GetMaterialSurface()->SetRollingFriction(rollfr);
+	ball->GetMaterialSurface()->SetSpinningFriction(rollfr);
+
+	
 	// Bottom box
 	utils::AddSphereGeometry(ball.get(),radius_g, ChVector<>(0, 0, 0),
 		ChQuaternion<>(1, 0, 0, 0), true);
@@ -306,7 +316,7 @@ int main(int argc, char** argv) {
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
+	//gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
 
 
 	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
