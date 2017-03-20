@@ -83,8 +83,8 @@ using std::endl;
 // --------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
-	double time_step = 1e-4;
-	double time_end = 2.00;
+	double time_step = 1e-3;
+	double time_end = 3.00;
 
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rollfr = 0.005 * radius_g;
+	double rollfr = 0.01 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
 		sys->GetSettings()->solver.alpha = 0;
 		sys->GetSettings()->solver.contact_recovery_speed = 0.1;
 		sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;//0.1
-		sys->ChangeSolverType(SolverType::BB);
+		sys->ChangeSolverType(SolverType::APGD);
 		system = sys;
 
 		break;
@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
 	system->Set_G_acc(ChVector<>(0, 0, -9.81));
 	system->GetSettings()->perform_thread_tuning = false;
 	system->GetSettings()->solver.use_full_inertia_tensor = false;
-	system->GetSettings()->solver.tolerance = 0.1;
+	system->GetSettings()->solver.tolerance = .1;// loosening the tolerance does not work(h=1e-4)
 	system->GetSettings()->solver.max_iteration_bilateral = max_iteration_bilateral;
 	system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
 	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ); 

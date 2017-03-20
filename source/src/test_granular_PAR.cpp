@@ -1,6 +1,6 @@
 // Victor Bertolazzo
 // Collection of all test granular codes.Switching from one to another can be done via case function.
-// For reference original files are kept in the repo, activate them disabling the comment in CmakeLists.tex file
+// For reference original files are kept in the repo, activate them disabling the comment in CMakeLists.tex file
 // ================================================================================================================
 
 #include <cmath>
@@ -20,7 +20,7 @@
 
 #include "chrono/collision/ChCCollisionUtils.h"
 
-
+#include "chrono_parallel/collision/ChBroadphaseUtils.h"
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/solver/ChIterativeSolverParallel.h"
 
@@ -48,7 +48,7 @@ using std::cout;
 using std::endl;
 
 int num_threads = 40;
-ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
+ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;
 // PovRay Output
 bool povray_output = false;
 // Material
@@ -59,9 +59,11 @@ bool render = true;
 bool track_granule = false;
 // Roughness
 bool roughness = false;
+// Broad vs Narr
+bool broad_narr = true;
 // --------------------------------------------------------------------------
 double radius_g = 0.01;
-double rolling_friction = 0.05 * radius_g;
+double rolling_friction = 0.005 * radius_g;
 // --------------------------------------------------------------------------
 double r = 1.01 * radius_g;
 
@@ -79,7 +81,7 @@ double mass_g = rho_g * vol_g;
 ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
 int num_layers = 22;
 
-// Terrain contact properties
+// Terrain contact DROP
 // Terrain contact properties---Default Ones are commented out.
 float friction_terrain = 0.7f;// 
 float restitution_terrain = 0.0f;
@@ -89,17 +91,18 @@ float kn_terrain = 1.0e4f;// 1.0e7f;
 float gn_terrain = 1.0e2f;
 float kt_terrain = 2.86e3f;// 2.86e6f;
 float gt_terrain = 1.0e2f;
-float coh_pressure_terrain = 1e2f;// 0e3f;
+float coh_pressure_terrain = 0e2f;// 0e3f;
 float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
 //// Estimates for number of bins for broad-phase
-//int factor = 2;
+int factor = 2;
 //int binsX = (int)std::ceil(hdimX / radius_g) / factor;
 //int binsY = (int)std::ceil(hdimY / radius_g) / factor;
-//int binsZ = 1;
-int binsX = 20;
-int binsY = 20;
+//int binsZ = 20;
+int binsX = 10;
+int binsY = 10;
 int binsZ = 10;
+
 // -------------------------
 double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 double Ra_r = 3.0*radius_g;//Default Size of particles.
@@ -195,16 +198,16 @@ void AddWall(ChVector<> lower, ChVector<> upper, std::shared_ptr<ChBody> body, d
 
 	body->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
 }
-// Particle Runtime Generation	
+// Particle Runtime Generation , case::DROP	
 int SpawnParticles(utils::Generator* gen) {
-	double dist = 2 * 0.99 * radius_g;
+	double dist = 2.3 * 1.01 * radius_g;
 
 	////gen->createObjectsBox(utils::POISSON_DISK,
 	////                     dist,
 	////                     ChVector<>(9, 0, 3),
 	////                     ChVector<>(0, 1, 0.5),
 	////                     ChVector<>(-initVel, 0, 0));
-	gen->createObjectsCylinderZ(utils::POISSON_DISK, dist, ChVector<>(0, 0, 0.25), 0.030f, 0, ChVector<>(0, 0, 0));
+	gen->createObjectsCylinderZ(utils::POISSON_DISK, dist, ChVector<>(0, 0, 0.15), 0.075f, 0, ChVector<>(0, 0, 0));
 	std::cout << "  total bodies: " << gen->getTotalNumBodies() << std::endl;
 
 	return gen->getTotalNumBodies();
@@ -267,13 +270,15 @@ void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std
 	tube->SetBodyFixed(false);// true + actuator yields two bodies explode
 	tube->SetCollide(true);
 	tube->SetMaterialSurface(material_terrain);
+	//tube->GetMaterialSurfaceDEM()->SetAdhesion(0.0);
 	tube->GetCollisionModel()->ClearModel();
 	ChQuaternion<> qtube;
 	qtube.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(1, 0, 0));
 	tube->SetPos(ChVector<>(0.0, .0, .0));
 	tube->SetRot(qtube);
-	for (int i = 0; i < 15; i++){
-		utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 5 * 20, 360, ChVector<>(0, 2 * i * 0.005, 0.), ChQuaternion<>(1.0, 0., 0., .0), true);
+	// In original file measures fulfill to those proposed by the cited article, here the same are adapted to the TR requirements.
+	for (int i = 0; i < 20; i++){
+		utils::AddTorusGeometry(tube.get(), .150, .005, 5 * 20, 360, ChVector<>(0, 2 * i * 0.005, 0.), ChQuaternion<>(1.0, 0., 0., .0), true);
 	}
 	//utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 20,360,ChVector<>(0,0,0),ChQuaternion<>(1.0,.0,.0,.0),true);
 	tube->GetCollisionModel()->BuildModel();
@@ -291,7 +296,7 @@ void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std
 	auto legge1 = std::make_shared<ChFunction_Const>();
 	legge1->Set_yconst(0.0);
 	auto legge2 = std::make_shared<ChFunction_Ramp>();
-	legge2->Set_ang(0.015);
+	legge2->Set_ang(0.075);//.015 in origin
 	auto sequence = std::make_shared<ChFunction_Sequence>();
 	sequence->InsertFunct(legge1, time_hold, 1.0, true);
 	sequence->InsertFunct(legge2, 300, 1.0, true);
@@ -303,7 +308,7 @@ void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std
 int main(int argc, char** argv) {
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
-	uint max_iteration_spinning = 100;
+	uint max_iteration_spinning = 200;
 	uint max_iteration_bilateral = 0;
 	// Create output directories.
 	if (povray_output) {
@@ -338,13 +343,13 @@ int main(int argc, char** argv) {
 	}
 	case ChMaterialSurfaceBase::DVI: {
 										 ChSystemParallelDVI* sys = new ChSystemParallelDVI;
-										 sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
+										 sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;
 										 sys->GetSettings()->solver.max_iteration_normal = 0;
-										 sys->GetSettings()->solver.max_iteration_sliding = 200;
-										 sys->GetSettings()->solver.max_iteration_spinning = 0;
+										 sys->GetSettings()->solver.max_iteration_sliding = 0;
+										 sys->GetSettings()->solver.max_iteration_spinning = max_iteration_spinning;
 										 sys->GetSettings()->solver.alpha = 0;
-										 sys->GetSettings()->solver.contact_recovery_speed = -1;
-										 sys->GetSettings()->collision.collision_envelope = 0.1 * radius_g;
+										 sys->GetSettings()->solver.contact_recovery_speed = .1;
+										 sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;
 										 sys->ChangeSolverType(SolverType::APGD);
 										 system = sys;
 
@@ -355,9 +360,11 @@ int main(int argc, char** argv) {
 	system->Set_G_acc(ChVector<>(0, 0, -9.81));
 	system->GetSettings()->perform_thread_tuning = false;
 	system->GetSettings()->solver.use_full_inertia_tensor = false;
-	system->GetSettings()->solver.tolerance = 0.1;
+	system->GetSettings()->solver.tolerance = 10.;//pumping it to tol=10, it achieves max_iter when new spawned particles
+													// collide against the ones on the floor.And then keep oscillating.
 	system->GetSettings()->solver.max_iteration_bilateral = 100;
 	system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
+	
 	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ);
 
 	// Set number of threads
@@ -462,6 +469,9 @@ int main(int argc, char** argv) {
 
 
 
+		double time_end = 4.50;
+		double time_step = 1e-4;
+
 	switch (workcase) {
 	case TestType::LAYER: {			
 								  // Create particles in layers until reaching the desired number of particles
@@ -492,27 +502,26 @@ int main(int argc, char** argv) {
 		case TestType::DROP: {		// 1200 bodies instead of 1300, too high 
 								 // Create particles in layers until reaching the desired number of particles
 								 ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//
-								 ChVector<> center(0, 0, 3.500);//.800
+								 ChVector<> center(0, 0, .7500);//.800
 
-								 gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.030, center.z() - .05);
+								 //gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 0.075, center.z() - .05);
 								 unsigned int num_particles = gen.getTotalNumBodies();
 								 std::cout << "Generated particles:  " << num_particles << std::endl;
-
+								 time_end = 10.00;
+								 if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
 								  break;
 		}
-		case TestType::CASCADE: {  // only 126 bodies instead of 1300
-									double time_hold = 1.0;
+		case TestType::CASCADE: {	double time_hold = 2.0;
 									CreateTube(system, container, material_terrain, time_hold);
 
 									// Create particles in layers until reaching the desired number of particles
 									double r = 1.01 * radius_g;
 									ChVector<> hdims(0.10 - r, 0.10 - r, 1.50);//W=.795, hdims object for the function gen.createObjectsBox accepts the	FULL dimensions in each direction:PAY ATTENTION
-									ChVector<> center(0, 0, .330);//.800
+									ChVector<> center(0, 0, .500);//.800
 
-									gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, .070 / 2, center.z() - .05);
+									gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, .100 , center.z() - .05);
 									unsigned int num_particles = gen.getTotalNumBodies();
 									std::cout << "Generated particles:  " << num_particles << std::endl;
-
 								  break;
 		}
 
@@ -522,8 +531,8 @@ int main(int argc, char** argv) {
 
 
 
-
-	
+// BRAODPHASE UTILS
+	vec3 bins = collision::function_Compute_Grid_Resolution(1000,real3(hdimX,hdimY,hdimZ),.1);
 
 	unsigned int num_particles = gen.getTotalNumBodies();
 	std::cout << "Generated particles:  " << num_particles << std::endl;
@@ -564,9 +573,7 @@ int main(int argc, char** argv) {
 	// ---------------
 	// Simulate system
 	// ---------------
-
-	double time_end = .50;
-	double time_step = 1e-4;
+	
 
 	double cum_sim_time = 0;
 	double cum_broad_time = 0;
@@ -593,6 +600,16 @@ int main(int argc, char** argv) {
 
 	while (system->GetChTime() < time_end) {
 		system->DoStepDynamics(time_step);
+
+		if (workcase == DROP && sim_frame % (int)(.1/time_step) == 0 && system->GetChTime() < 6.00){
+			SpawnParticles(&gen);
+			if (broad_narr){// temp loc
+				int broad = system->data_manager->measures.collision.number_of_contacts_possible;
+				int narr = system->data_manager->num_rigid_contacts;
+				std::cout << "Potential Contacts : " << broad << " , Actual Contacts : " << narr << std::endl;
+			}
+		}
+
 
 		auto list = system->Get_bodylist();
 		std::vector<double> zs;
@@ -643,7 +660,8 @@ int main(int argc, char** argv) {
 			}
 		}
 #endif
-		
+	
+		sim_frame++;
 	}
 	// Gnuplot
 	ChGnuPlot mplot("__tmp_gnuplot_4.gpl");
