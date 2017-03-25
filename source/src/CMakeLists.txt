@@ -1,8 +1,10 @@
 
 SET(MODELS
 #  cascading_packing_condition
+  central_pivot_mech
 #  demo_IRR_fel
 #  demo_PAR_friction
+  demo_VEH_wheelloader
   hydraulic_force
   iArmlinkage
   test_granular_PAR
@@ -26,7 +28,7 @@ SET(MODELS
 # Invoke find_package in CONFIG mode
 
 find_package(Chrono
-             COMPONENTS Irrlicht Opengl Parallel
+             COMPONENTS Irrlicht Opengl Parallel Vehicle
              CONFIG
 )
 
