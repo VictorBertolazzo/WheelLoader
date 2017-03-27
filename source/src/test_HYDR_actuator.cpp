@@ -16,10 +16,6 @@
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/solver/ChIterativeSolverParallel.h"
 
-#ifdef CHRONO_OPENGL
-#include "chrono_opengl/ChOpenGLWindow.h"
-#endif
-
 #include "chrono/motion_functions/ChFunction_Recorder.h"
 #include "chrono/motion_functions/ChFunction_Integrate.h"
 #include "chrono/motion_functions/ChFunction_Base.h"
@@ -31,6 +27,10 @@
 
 #include "chrono_postprocess/ChGnuPlot.h"
 
+
+#ifdef CHRONO_OPENGL
+#include "chrono_opengl/ChOpenGLWindow.h"
+#endif
 
 using namespace chrono;
 using namespace postprocess;

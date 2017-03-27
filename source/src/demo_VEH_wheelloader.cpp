@@ -33,6 +33,7 @@
 #include "chrono_models/vehicle/generic/Generic_Wheel.h"
 #include "chrono_models/vehicle/generic/Generic_Driveline2WD.h"//4wd
 #include "chrono_models/vehicle/generic/Generic_BrakeSimple.h"
+#include "chrono_models/vehicle/hmmwv/HMMWV_Driveline4WD.h"
 
 #include "chrono_vehicle/ChApiVehicle.h"
 #include "chrono_vehicle/wheeled_vehicle/ChSteering.h"
@@ -52,7 +53,11 @@
 //#define USE_PENALTY
 using namespace chrono;
 using namespace chrono::vehicle;
+using namespace chrono::vehicle::generic;
+using namespace chrono::vehicle::hmmwv;
 
+
+// Concrete class defining the WL steering mechanism
 class CenterPivot : public ChSteering {
 	public:
 
@@ -72,7 +77,7 @@ class CenterPivot : public ChSteering {
 			ChFrame<> steering_to_abs(location, rotation);
 			steering_to_abs.ConcatenatePreTransformation(chassis->GetFrame_REF_to_abs());
 			// Create and initialize the steering link body
-			ChVector<> link_local(0, 0, 0);
+			ChVector<> link_local(0., .0, -0.02);
 			ChVector<> link_abs = steering_to_abs.TransformPointLocalToParent(link_local);
 
 			m_pivot = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
@@ -89,33 +94,33 @@ class CenterPivot : public ChSteering {
 			chassis->GetSystem()->AddLink(m_pivoting);
 
 			// Create and initialize the RIGHT steering link body
-			ChVector<> r_link_local(0.385, -0.45, -0.02);
-			ChVector<> r_link_abs = steering_to_abs.TransformPointLocalToParent(r_link_local);
+			ChVector<> r_link_local(-.10, -0.45, -0.02);
+			r_link_abs = steering_to_abs.TransformPointLocalToParent(r_link_local);
 			// Create and initialize the LEFT steering link body
-			ChVector<> l_link_local(0.385, 0.45, -0.02);
-			ChVector<> l_link_abs = steering_to_abs.TransformPointLocalToParent(l_link_local);
+			ChVector<> l_link_local(-.10, 0.45, -0.02);
+			l_link_abs = steering_to_abs.TransformPointLocalToParent(l_link_local);
 			// Create and initialize the revolute joint btw links and pivot
-			ChVector<> rev_local(-.2, 0., 0);
-			ChVector<> rev_abs = steering_to_abs.TransformPointLocalToParent(rev_local);
+			ChVector<> rev_local(-.1, .0, -0.02);
+			rev_abs = steering_to_abs.TransformPointLocalToParent(rev_local);
 
 			m_r_link = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
 			m_r_link->SetNameString(m_name + "_r_link");
-			m_r_link->SetPos(r_link_abs);
+			m_r_link->SetPos(rev_abs);
 			m_r_link->SetRot(steering_to_abs.GetRot());
 			chassis->GetSystem()->AddBody(m_r_link);
 
 			m_l_link = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
 			m_l_link->SetNameString(m_name + "_l_link");
-			m_l_link->SetPos(l_link_abs);
+			m_l_link->SetPos(rev_abs);
 			m_l_link->SetRot(steering_to_abs.GetRot());
 			chassis->GetSystem()->AddBody(m_l_link);
 
 			m_r_rev = std::make_shared<ChLinkLockRevolute>();
-			m_r_rev->Initialize(m_pivot, m_r_link, ChCoordsys<>(rev_abs+ChVector<>(.0,.0,.1),steering_to_abs.GetRot()));
+			m_r_rev->Initialize(m_pivot, m_r_link, ChCoordsys<>(rev_abs+ChVector<>(.0,.0,.01),steering_to_abs.GetRot()));
 			chassis->GetSystem()->AddLink(m_r_rev);
 
 			m_l_rev = std::make_shared<ChLinkLockRevolute>();
-			m_l_rev->Initialize(m_pivot, m_l_link, ChCoordsys<>(rev_abs + ChVector<>(.0, .0, -.1), steering_to_abs.GetRot()));
+			m_l_rev->Initialize(m_pivot, m_l_link, ChCoordsys<>(rev_abs + ChVector<>(.0, .0, -.01), steering_to_abs.GetRot()));
 			chassis->GetSystem()->AddLink(m_l_rev);
 
 
@@ -133,26 +138,30 @@ class CenterPivot : public ChSteering {
 			if (vis == chrono::vehicle::VisualizationType::NONE)
 				return;
 			auto piv1_asset = std::make_shared<ChCylinderShape>(); 
-			piv1_asset->GetCylinderGeometry().rad = .075; 
+			piv1_asset->GetCylinderGeometry().rad = .015; 
 			piv1_asset->GetCylinderGeometry().p1 = ChVector<>(.0, -.2, 0.);
 			piv1_asset->GetCylinderGeometry().p2 = VNULL;
 			m_pivot->AddAsset(piv1_asset);
 			auto piv2_asset = std::make_shared<ChCylinderShape>(); 
-			piv2_asset->GetCylinderGeometry().rad = .075; 
+			piv2_asset->GetCylinderGeometry().rad = .015; 
 			piv2_asset->GetCylinderGeometry().p1 =  ChVector<>(-.2, 0, 0.); 
 			piv2_asset->GetCylinderGeometry().p2 = VNULL;
 			m_pivot->AddAsset(piv2_asset);
 
-			auto rl_asset = std::make_shared<ChCylinderShape>(); rl_asset->GetCylinderGeometry().rad = .05; 
-			rl_asset->GetCylinderGeometry().p1 = ChVector<>(0, +.5, 0);
-			rl_asset->GetCylinderGeometry().p2 = ChVector<>(0, -.5, 0);
+			auto rl_asset = std::make_shared<ChCylinderShape>(); rl_asset->GetCylinderGeometry().rad = .01; 
+			rl_asset->GetCylinderGeometry().p1 = m_r_link->GetFrame_COG_to_abs().GetInverse() * (rev_abs + ChVector<>(.0, .0, .01));
+			rl_asset->GetCylinderGeometry().p2 = m_r_link->GetFrame_COG_to_abs().GetInverse() * (r_link_abs);;
 			m_r_link->AddAsset(rl_asset);
 			auto ll_asset = std::make_shared<ChCylinderShape>(); 
-			ll_asset->GetCylinderGeometry().rad = .05; 
-			ll_asset->GetCylinderGeometry().p1 = ChVector<>(0, +.5, 0);
-			ll_asset->GetCylinderGeometry().p2 = ChVector<>(0 , -.5, 0); 
+			ll_asset->GetCylinderGeometry().rad = .01; 
+			ll_asset->GetCylinderGeometry().p1 = m_l_link->GetFrame_COG_to_abs().GetInverse() * (rev_abs + ChVector<>(.0, .0, -.01));
+			ll_asset->GetCylinderGeometry().p2 = m_l_link->GetFrame_COG_to_abs().GetInverse() * (l_link_abs);
 			m_l_link->AddAsset(ll_asset);
-					
+			
+			auto col = std::make_shared<ChColorAsset>(0.7f,0.0f,0.0f);
+			/*m_r_link->AddAsset(col);
+			m_l_link->AddAsset(col);
+*/
 		}
 
 		void CenterPivot::LogConstraintViolations() {
@@ -207,6 +216,9 @@ class CenterPivot : public ChSteering {
 		}
 		std::shared_ptr<ChBody> GetSteeringLinks(){}
 		double CenterPivot::GetMass() const { return m_mass; }
+		ChVector<> rev_abs;
+		ChVector<> r_link_abs;
+		ChVector<> l_link_abs;
 
 protected:
 	std::shared_ptr<ChBody> m_pivot;
@@ -220,6 +232,7 @@ protected:
 
 };
 
+// Concrete class defining the WL no-suspension mechanism
 class RigidAxle : public ChSuspension{
 public:
 
@@ -304,8 +317,8 @@ public:
 		m_knuckle[side]->SetNameString(m_name + "_knuckle" + suffix);
 		m_knuckle[side]->SetPos(points[KNUCKLE_CM]);
 		m_knuckle[side]->SetRot(chassisRot);
-			//m_knuckle[side]->SetMass(getKnuckleMass());
-			//m_knuckle[side]->SetInertiaXX(getKnuckleInertia());
+			m_knuckle[side]->SetMass(.01);	//m_knuckle[side]->SetMass(getKnuckleMass());
+			m_knuckle[side]->SetInertiaXX(.01);//m_knuckle[side]->SetInertiaXX(getKnuckleInertia());
 		chassis->GetSystem()->AddBody(m_knuckle[side]);
 
 		// Create and initialize spindle body (same orientation as the chassis)
@@ -314,8 +327,8 @@ public:
 		m_spindle[side]->SetPos(points[SPINDLE]);
 		m_spindle[side]->SetRot(chassisRot);
 		m_spindle[side]->SetWvel_loc(ChVector<>(0, ang_vel, 0));
-			//m_spindle[side]->SetMass(getSpindleMass());
-			//m_spindle[side]->SetInertiaXX(getSpindleInertia());
+			m_spindle[side]->SetMass(.01);
+			m_spindle[side]->SetInertiaXX(.01);
 		chassis->GetSystem()->AddBody(m_spindle[side]);
 
 		// Create and initialize the tierod body.
@@ -323,6 +336,8 @@ public:
 		m_tierod[side]->SetNameString(m_name + "_tierod" + suffix);
 		m_tierod[side]->SetPos((points[TIEROD_K]) / 2 + (points[TIEROD_S]) / 2);
 		m_tierod[side]->SetRot(chassis->GetFrame_REF_to_abs().GetRot());
+			m_tierod[side]->SetMass(.01);
+			m_tierod[side]->SetInertiaXX(.01);
 		chassis->GetSystem()->AddBody(m_tierod[side]);
 
 		// Create and initialize the joint between knuckle and tierod (one side has universal, the other has spherical).
@@ -460,7 +475,7 @@ public:
 	void AddVisualizationAssets() override;
 	void RemoveVisualizationAssets() override;
 	*/
-	double GetMass() const override{ return 10; }
+	double GetMass() const override{ return 1; }
 	double getSpindleRadius() const override{ return 0.01; }
 	double getSpindleWidth() const override{ return 0.02; }
 
@@ -537,7 +552,7 @@ protected:
 		case TIEROD_CM:
 			return ChVector<>(0, 0.425, -0.05);
 		case TIEROD_S:
-			return ChVector<>(0.385, 0.45, -0.02);
+			return ChVector<>(-.175, 0.45, -0.02);
 		default:
 			return ChVector<>(0, 0, 0);
 		}
@@ -557,13 +572,14 @@ private:
 	std::shared_ptr<ChLinkLockSpherical> m_sphericalTierod[2];
 	std::shared_ptr<ChLinkLockRevolute> m_revoluteKingpin[2];
 	std::shared_ptr<ChLinkLockSpherical> m_sphericalSteering[2];
-	std::shared_ptr<ChLinkLockRevolute> m_revolute[2];
+	//std::shared_ptr<ChLinkLockRevolute> m_revolute[2];
 
 	//std::shared_ptr<ChShaft> m_axle[2];
 	//std::shared_ptr<ChShaftsBody> m_axle_to_spindle[2];
 	//std::shared_ptr<ChBody> m_spindle[2];    ///< handles to 
 
 };
+
 bool render = true;
 int main(int argc, char* argv[]) {
 	// --------------------------
@@ -609,31 +625,72 @@ int main(int argc, char* argv[]) {
 #pragma omp master
 	{ std::cout << "Actual number of OpenMP threads: " << omp_get_num_threads() << std::endl; }
 
-	//////////////////////////////////////////////////////////////////////////////////
-	auto chass = std::shared_ptr<ChBodyAuxRef>(system->NewBodyAuxRef());
-	chass->SetBodyFixed(true);
-	system->Add(chass);
+	///////////////////// -----------INITIAL TESTING PART----------------------
+		////auto chass = std::shared_ptr<ChBodyAuxRef>(system->NewBodyAuxRef());
+		////chass->SetBodyFixed(true);
+		////system->Add(chass);
 
-	auto test = std::make_shared<CenterPivot>("Test");
-	test->Initialize(chass, VNULL, QUNIT);
-	std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
-	std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
-	test->AddVisualizationAssets(VisualizationType::MESH);
+		////auto test = std::make_shared<CenterPivot>("Test");
+		////test->Initialize(chass, ChVector<>(1.60, 0, -.0), QUNIT);
+		////std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
+		////std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
+		////test->AddVisualizationAssets(VisualizationType::MESH);
 
 
-	auto test1 = std::make_shared<RigidAxle>("Test_1");
-	test1->Initialize(chass, ChVector<>(0.,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
-	test1->AddVisualizationAssets(VisualizationType::MESH);
-	//auto test2 = std::make_shared<RigidAxle>("Test_2");
-	//test2->Initialize(chass, ChVector<>(0., 0., 0.),chass, 0, 0);
-	//test2->AddVisualizationAssets(VisualizationType::MESH);
+		////auto test1 = std::make_shared<RigidAxle>("Test_1");
+		////test1->Initialize(chass, ChVector<>(1.6914,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
+		////test1->AddVisualizationAssets(VisualizationType::MESH);
+
+		//////auto test2 = std::make_shared<RigidAxle>("Test_2");
+		//////test2->Initialize(chass, ChVector<>(1.6914, 0, 0), chass, 0, 0);
+		//////test2->AddVisualizationAssets(VisualizationType::MESH);
+	ChSuspensionList m_suspensions;
+	//std::vector<std::shared_ptr<RigidAxle>> m_suspensions;
+	std::shared_ptr<CenterPivot> m_steerings;
+	ChWheelList m_wheels;
+	ChBrakeList m_brakes;
+	std::shared_ptr<HMMWV_Driveline4WD> m_driveline;
+
+	auto m_chassis = std::make_shared<Generic_Chassis>("Chassis");
+	//m_steerings.resize(1);
+	m_steerings = std::make_shared<CenterPivot>("Steering");
+	m_suspensions.resize(2);
+	m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
+	m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
+	m_wheels.resize(4);
+	m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
+	m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
+	m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
+	m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
+	m_brakes.resize(4);
+	m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
+	m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
+	m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
+	m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
+	m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
+
+	m_chassis->Initialize(system, ChCoordsys<>(VNULL,QUNIT), 0.);
+	m_steerings->Initialize(m_chassis->GetBody(), ChVector<>(1.60, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
+	m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink(LEFT), m_steerings->GetSteeringLink(RIGHT), 0, 0);
+	m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6865, 0, 0), m_chassis->GetBody(),0,0);
+	m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
+	m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
+	m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
+	m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
+	m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
+	m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
+	m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
+	m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+
+	std::vector<int> driven_susp(0, 1);
+	m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
 
 #ifdef CHRONO_OPENGL
 	if (render) {
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
 		gl_window.Initialize(1280, 720, "Sandpile + zBar", system);
-		gl_window.SetCamera(ChVector<>(5, 8, 0), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
-		gl_window.SetRenderMode(opengl::POINTS);
+		gl_window.SetCamera(ChVector<>(2, 2, 0), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
+		gl_window.SetRenderMode(opengl::SOLID);
 	}
 #endif
 
