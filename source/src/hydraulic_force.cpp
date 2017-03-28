@@ -180,10 +180,21 @@ int main(int argc, char** argv) {
 		ChQuaternion<>(1, 0, 0, 0), true);
 	bodyB->GetCollisionModel()->BuildModel();
 
-	auto linAB = std::make_shared<ChLinkLinActuator>();
+	auto linAB = std::make_shared<ChLinkLinActuator>(); system->AddLink(linAB);
 	linAB->Initialize(bodyA,bodyB,ChCoordsys<>(ChVector<>(.5,0,0),chrono::Q_from_AngAxis(CH_C_PI_2,VECT_Y)));
 	linAB->Set_lin_offset(10.);//safe
 	
+	// Setup the function
+	auto pres_function = std::shared_ptr<ChFunction_Recorder>();
+	if (mode == INFILE){
+		ReadFile(act_input, input);
+		//ChFunction_Recorder pressure;
+		for (int i = 0; i < input.size(); i++){
+			pres_function->AddPoint(input[i].mt, input[i].mv);
+		}
+	}
+
+	linAB->Set_dist_funct(pres_function);
 
 
 	while (system->GetChTime() < 50.) {

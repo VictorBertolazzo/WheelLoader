@@ -626,64 +626,65 @@ int main(int argc, char* argv[]) {
 	{ std::cout << "Actual number of OpenMP threads: " << omp_get_num_threads() << std::endl; }
 
 	///////////////////// -----------INITIAL TESTING PART----------------------
-		////auto chass = std::shared_ptr<ChBodyAuxRef>(system->NewBodyAuxRef());
-		////chass->SetBodyFixed(true);
-		////system->Add(chass);
+		auto chass = std::shared_ptr<ChBodyAuxRef>(system->NewBodyAuxRef());
+		chass->SetBodyFixed(true);
+		system->Add(chass);
 
-		////auto test = std::make_shared<CenterPivot>("Test");
-		////test->Initialize(chass, ChVector<>(1.60, 0, -.0), QUNIT);
-		////std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
-		////std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
-		////test->AddVisualizationAssets(VisualizationType::MESH);
+		auto test = std::make_shared<CenterPivot>("Test");
+		test->Initialize(chass, ChVector<>(1.60, 0, -.0), QUNIT);
+		std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
+		std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
+		test->AddVisualizationAssets(VisualizationType::MESH);
 
 
-		////auto test1 = std::make_shared<RigidAxle>("Test_1");
-		////test1->Initialize(chass, ChVector<>(1.6914,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
-		////test1->AddVisualizationAssets(VisualizationType::MESH);
+		auto test1 = std::make_shared<RigidAxle>("Test_1");
+		test1->Initialize(chass, ChVector<>(1.6914,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
+		test1->AddVisualizationAssets(VisualizationType::MESH);
 
-		//////auto test2 = std::make_shared<RigidAxle>("Test_2");
-		//////test2->Initialize(chass, ChVector<>(1.6914, 0, 0), chass, 0, 0);
-		//////test2->AddVisualizationAssets(VisualizationType::MESH);
-	ChSuspensionList m_suspensions;
-	//std::vector<std::shared_ptr<RigidAxle>> m_suspensions;
-	std::shared_ptr<CenterPivot> m_steerings;
-	ChWheelList m_wheels;
-	ChBrakeList m_brakes;
-	std::shared_ptr<HMMWV_Driveline4WD> m_driveline;
+		//auto test2 = std::make_shared<RigidAxle>("Test_2");
+		//test2->Initialize(chass, ChVector<>(1.6914, 0, 0), chass, 0, 0);
+		//test2->AddVisualizationAssets(VisualizationType::MESH);
 
-	auto m_chassis = std::make_shared<Generic_Chassis>("Chassis");
-	//m_steerings.resize(1);
-	m_steerings = std::make_shared<CenterPivot>("Steering");
-	m_suspensions.resize(2);
-	m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
-	m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
-	m_wheels.resize(4);
-	m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
-	m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
-	m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
-	m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
-	m_brakes.resize(4);
-	m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
-	m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
-	m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
-	m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
-	m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
+	//ChSuspensionList m_suspensions;
+	////std::vector<std::shared_ptr<RigidAxle>> m_suspensions;
+	//std::shared_ptr<CenterPivot> m_steerings;
+	//ChWheelList m_wheels;
+	//ChBrakeList m_brakes;
+	//std::shared_ptr<HMMWV_Driveline4WD> m_driveline;
 
-	m_chassis->Initialize(system, ChCoordsys<>(VNULL,QUNIT), 0.);
-	m_steerings->Initialize(m_chassis->GetBody(), ChVector<>(1.60, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
-	m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink(LEFT), m_steerings->GetSteeringLink(RIGHT), 0, 0);
-	m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6865, 0, 0), m_chassis->GetBody(),0,0);
-	m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
-	m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
-	m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
-	m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
-	m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
-	m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
-	m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
-	m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+	//auto m_chassis = std::make_shared<Generic_Chassis>("Chassis");
+	////m_steerings.resize(1);
+	//m_steerings = std::make_shared<CenterPivot>("Steering");
+	//m_suspensions.resize(2);
+	//m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
+	//m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
+	//m_wheels.resize(4);
+	//m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
+	//m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
+	//m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
+	//m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
+	//m_brakes.resize(4);
+	//m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
+	//m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
+	//m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
+	//m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
+	//m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
 
-	std::vector<int> driven_susp(0, 1);
-	m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
+	//m_chassis->Initialize(system, ChCoordsys<>(VNULL,QUNIT), 0.);
+	//m_steerings->Initialize(m_chassis->GetBody(), ChVector<>(1.60, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
+	//m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink(LEFT), m_steerings->GetSteeringLink(RIGHT), 0, 0);
+	//m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6865, 0, 0), m_chassis->GetBody(),0,0);
+	//m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
+	//m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
+	//m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
+	//m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
+	//m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
+	//m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
+	//m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
+	//m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+
+	//std::vector<int> driven_susp(0, 1);
+	//m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
 
 #ifdef CHRONO_OPENGL
 	if (render) {

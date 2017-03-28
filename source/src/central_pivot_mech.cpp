@@ -98,7 +98,8 @@ int main(int argc, char** argv) {
 
 
 	auto rev_ll2pivot = std::make_shared<ChLinkLockRevolute>();
-	auto rev_rl2pivot = std::make_shared<ChLinkLockRevolute>();
+		auto rev_rl2pivot = std::make_shared<ChLinkLockRevolute>();
+
 	auto rev_pivot2axle = std::make_shared<ChLinkEngine>();
 	
 
@@ -118,56 +119,60 @@ int main(int argc, char** argv) {
 	ChVector<> LEFT_LINK(-.2, 0, .3);
 	ChVector<> RIGHT_STUB(0, -w / 2, .5);
 	ChVector<> LEFT_STUB(0, +w / 2, .5);
+	
+	ChVector<> RIGHT_DIST(0, -w / 2 -.05, .45);
+	ChVector<> LEFT_DIST(0, +w / 2 +.05, .45);
+
 	ChVector<> RIGHT_BALL(-.2, -w / 2 + w/20, .35);
 	ChVector<> LEFT_BALL(-.2, +w / 2 - w/20, .35);
 
 
 	// Initialization
 	axle->SetPos(COG_AXLE); system.Add(axle); axle->SetBodyFixed(true);
-	auto a_asset = std::make_shared<ChBoxShape>(); a_asset->GetBoxGeometry().Size = ChVector<>(.1, w/2, .1); axle->AddAsset(a_asset);
+	auto a_asset = std::make_shared<ChBoxShape>(); a_asset->GetBoxGeometry().Size = ChVector<>(.05, w/2, .05); axle->AddAsset(a_asset);
 	pivot->SetPos(COG_PIVOT); system.Add(pivot); pivot->SetBodyFixed(false);
-	auto piv1_asset = std::make_shared<ChCylinderShape>(); piv1_asset->GetCylinderGeometry().rad = .075; piv1_asset->GetCylinderGeometry().p1 = pivot->GetFrame_COG_to_abs().GetInverse() * ChVector<>(.1, -w / 6 - w/8, 0.55); piv1_asset->GetCylinderGeometry().p2 = VNULL;
+	auto piv1_asset = std::make_shared<ChCylinderShape>(); piv1_asset->GetCylinderGeometry().rad = .015; piv1_asset->GetCylinderGeometry().p1 = pivot->GetFrame_COG_to_abs().GetInverse() * ChVector<>(.1, -w / 6 - w/8, 0.55); piv1_asset->GetCylinderGeometry().p2 = VNULL;
 	pivot->AddAsset(piv1_asset);
-	auto piv2_asset = std::make_shared<ChCylinderShape>(); piv2_asset->GetCylinderGeometry().rad = .075; piv2_asset->GetCylinderGeometry().p1 = pivot->GetFrame_COG_to_abs().GetInverse() * ChVector<>(-.2, 0, 0.55); piv2_asset->GetCylinderGeometry().p2 = VNULL;
+	auto piv2_asset = std::make_shared<ChCylinderShape>(); piv2_asset->GetCylinderGeometry().rad = .015; piv2_asset->GetCylinderGeometry().p1 = pivot->GetFrame_COG_to_abs().GetInverse() * ChVector<>(-.2, 0, 0.55); piv2_asset->GetCylinderGeometry().p2 = VNULL;
 	pivot->AddAsset(piv2_asset);
 	rev_pivot2axle->Initialize(pivot, axle, ChCoordsys<>(pivot->GetPos(), QUNIT)); 
 	rev_pivot2axle->Set_shaft_mode(ChLinkEngine::ENG_SHAFT_LOCK); rev_pivot2axle->Set_eng_mode(ChLinkEngine::ENG_MODE_ROTATION);system.AddLink(rev_pivot2axle);
-	auto rot_fun = std::make_shared<ChFunction_Sine>(); rot_fun->Set_amp(.1); rot_fun->Set_freq(4.);
+	auto rot_fun = std::make_shared<ChFunction_Sine>(); rot_fun->Set_amp(.2); rot_fun->Set_freq(4.);
 	rev_pivot2axle->Set_rot_funct(rot_fun);
 	
 	right_link->SetPos(RIGHT_LINK); system.Add(right_link);
-	auto rl_asset = std::make_shared<ChCylinderShape>(); rl_asset->GetCylinderGeometry().rad = .05; rl_asset->GetCylinderGeometry().p1 = VNULL; rl_asset->GetCylinderGeometry().p2 = right_link->GetFrame_COG_to_abs().GetInverse() * RIGHT_BALL; right_link->AddAsset(rl_asset);
+	auto rl_asset = std::make_shared<ChCylinderShape>(); rl_asset->GetCylinderGeometry().rad = .03; rl_asset->GetCylinderGeometry().p1 = VNULL; rl_asset->GetCylinderGeometry().p2 = right_link->GetFrame_COG_to_abs().GetInverse() * RIGHT_BALL; right_link->AddAsset(rl_asset);
 	left_link->SetPos(LEFT_LINK); system.Add(left_link);
-	auto ll_asset = std::make_shared<ChCylinderShape>(); ll_asset->GetCylinderGeometry().rad = .05; ll_asset->GetCylinderGeometry().p1 = VNULL; ll_asset->GetCylinderGeometry().p2 = left_link->GetFrame_COG_to_abs().GetInverse() * LEFT_BALL; left_link->AddAsset(ll_asset);
+	auto ll_asset = std::make_shared<ChCylinderShape>(); ll_asset->GetCylinderGeometry().rad = .03; ll_asset->GetCylinderGeometry().p1 = VNULL; ll_asset->GetCylinderGeometry().p2 = left_link->GetFrame_COG_to_abs().GetInverse() * LEFT_BALL; left_link->AddAsset(ll_asset);
 
 	rev_ll2pivot->Initialize(left_link,pivot,ChCoordsys<>(LEFT_LINK,QUNIT)); system.AddLink(rev_ll2pivot);
 	rev_rl2pivot->Initialize(right_link, pivot, ChCoordsys<>(RIGHT_LINK, QUNIT)); system.AddLink(rev_rl2pivot);
+	
+	// Killing two extra dofs.
 
 	right_stub->SetPos(RIGHT_STUB); system.Add(right_stub); right_stub->SetRot(chrono::Q_from_AngAxis(CH_C_PI_2,VECT_Z));
 	left_stub->SetPos(LEFT_STUB); system.Add(left_stub); left_stub->SetRot(chrono::Q_from_AngAxis(CH_C_PI_2, VECT_Z));
-	ChVector<> patch(.075, 0, 0);
-	ChVector<> offset(.1, 0, 0);
-	auto rs_asset = std::make_shared<ChCylinderShape>(); rs_asset->GetCylinderGeometry().rad = .5; rs_asset->GetCylinderGeometry().p1 = -offset - patch; rs_asset->GetCylinderGeometry().p2 = -offset + patch; right_stub->AddAsset(rs_asset);
-	auto ls_asset = std::make_shared<ChCylinderShape>(); ls_asset->GetCylinderGeometry().rad = .5; ls_asset->GetCylinderGeometry().p1 = offset - patch; ls_asset->GetCylinderGeometry().p2 = offset + patch; left_stub->AddAsset(ls_asset);
-
-	
+	ChVector<> patch(.07, 0, 0);
+	ChVector<> offset(.4, 0, 0);
+	auto rs_asset = std::make_shared<ChCylinderShape>(); rs_asset->GetCylinderGeometry().rad = .10; rs_asset->GetCylinderGeometry().p1 = -offset - patch; rs_asset->GetCylinderGeometry().p2 = -offset + patch; right_stub->AddAsset(rs_asset);
+	auto ls_asset = std::make_shared<ChCylinderShape>(); ls_asset->GetCylinderGeometry().rad = .10; ls_asset->GetCylinderGeometry().p1 = offset - patch; ls_asset->GetCylinderGeometry().p2 = offset + patch; left_stub->AddAsset(ls_asset);
+	auto rs_s_asset = std::make_shared<ChSphereShape>(); rs_s_asset->GetSphereGeometry().rad = .05; rs_s_asset->Pos = right_stub->GetFrame_COG_to_abs().GetInverse() * RIGHT_DIST;
+	auto ls_s_asset = std::make_shared<ChSphereShape>(); ls_s_asset->GetSphereGeometry().rad = .05; ls_s_asset->Pos = left_stub->GetFrame_COG_to_abs().GetInverse() * LEFT_DIST;
+	right_stub->AddAsset(rs_s_asset); left_stub->AddAsset(ls_s_asset);
+	// Revolute Joints btw chassis and knuckles(z-axis)
 	rev_ls2axle->Initialize(left_stub, axle, ChCoordsys<>(LEFT_STUB, QUNIT)); system.AddLink(rev_ls2axle);
 	rev_rs2axle->Initialize(right_stub, axle, ChCoordsys<>(RIGHT_STUB, QUNIT)); system.AddLink(rev_rs2axle);
+	// Distance Constraints btw steering links and knuckles
+	auto dist_left = std::make_shared<ChLinkDistance>();
+	dist_left->Initialize(left_stub, left_link, false, LEFT_BALL, LEFT_DIST);
+	system.AddLink(dist_left);
+	auto dist_right = std::make_shared<ChLinkDistance>();
+	dist_right->Initialize(right_stub, right_link, false, RIGHT_BALL, RIGHT_DIST);
+	system.AddLink(dist_right);
 
-	       // Directly to the stub
-	rev_lr2ls->Initialize(left_stub, left_link, ChCoordsys<>(LEFT_BALL, QUNIT)); system.AddLink(rev_lr2ls);
-	rev_rr2rs->Initialize(right_stub, right_link, ChCoordsys<>(RIGHT_BALL, QUNIT)); system.AddLink(rev_rr2rs);
-		  // Using rod body
-	//right_rod->SetPos(RIGHT_STUB); system.Add(right_rod);
-	//auto rr_asset = std::make_shared<ChCylinderShape>(); rr_asset->GetCylinderGeometry().rad = .015; rr_asset->GetCylinderGeometry().p1 = VNULL; rr_asset->GetCylinderGeometry().p2 = right_rod->GetFrame_COG_to_abs().GetInverse() * RIGHT_BALL; right_rod->AddAsset(rr_asset);
-	//left_rod->SetPos(LEFT_STUB); system.Add(left_rod);
-	//auto lr_asset = std::make_shared<ChCylinderShape>(); lr_asset->GetCylinderGeometry().rad = .015; lr_asset->GetCylinderGeometry().p1 = VNULL; ll_asset->GetCylinderGeometry().p2 = left_rod->GetFrame_COG_to_abs().GetInverse() * LEFT_BALL; left_rod->AddAsset(lr_asset);
-
-	//rev_ll2lr->Initialize(left_rod, left_link, ChCoordsys<>(LEFT_BALL, QUNIT)); system.AddLink(rev_ll2lr);
-	//rev_rl2rr->Initialize(right_rod, right_link, ChCoordsys<>(RIGHT_BALL, QUNIT)); system.AddLink(rev_rl2rr);
-
-	//rev_lr2ls->Initialize(left_stub, left_rod, ChCoordsys<>(LEFT_STUB, QUNIT)); system.AddLink(rev_lr2ls);
-	//rev_rr2rs->Initialize(right_stub, right_rod, ChCoordsys<>(RIGHT_STUB, QUNIT)); system.AddLink(rev_rr2rs);
+	//       // Directly to the stub
+	//rev_lr2ls->Initialize(left_stub, left_link, ChCoordsys<>(LEFT_BALL, QUNIT)); system.AddLink(rev_lr2ls);
+	//rev_rr2rs->Initialize(right_stub, right_link, ChCoordsys<>(RIGHT_BALL, QUNIT)); system.AddLink(rev_rr2rs);
 
 	// No collision
 	axle->SetCollide(false); right_link->SetCollide(false); left_link->SetCollide(false);
