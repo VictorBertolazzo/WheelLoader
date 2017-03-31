@@ -33,7 +33,7 @@
 #endif
 
 enum TestType {LAYER, FUNNEL, DROP, CASCADE};
-TestType workcase = TestType::CASCADE;
+TestType workcase = TestType::LAYER;
 using namespace chrono;
 using namespace postprocess;
 
@@ -79,7 +79,7 @@ double rho_g = 2500;
 double vol_g = (4.0 / 3) * CH_C_PI * radius_g * radius_g * radius_g;
 double mass_g = rho_g * vol_g;
 ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
-int num_layers = 22;
+int num_layers = 10;
 
 // Terrain contact DROP
 // Terrain contact properties---Default Ones are commented out.
@@ -270,7 +270,6 @@ void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std
 	tube->SetBodyFixed(false);// true + actuator yields two bodies explode
 	tube->SetCollide(true);
 	tube->SetMaterialSurface(material_terrain);
-	//tube->GetMaterialSurfaceDEM()->SetAdhesion(0.0);
 	tube->GetCollisionModel()->ClearModel();
 	ChQuaternion<> qtube;
 	qtube.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(1, 0, 0));
@@ -283,14 +282,12 @@ void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std
 	//utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 20,360,ChVector<>(0,0,0),ChQuaternion<>(1.0,.0,.0,.0),true);
 	tube->GetCollisionModel()->BuildModel();
 
-	ChQuaternion<> z2z;
-	//z2z.Q_from_AngAxis(0.0, ChVector<>(0, 1, 0));
 	// Create a prismatic actuator btw CONTAINER and TUBE
 	auto prismCT = std::make_shared<ChLinkLockPrismatic>();
-	prismCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), z2z));
+	prismCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), QUNIT));
 	system->AddLink(prismCT);
 	auto linCT = std::make_shared<ChLinkLinActuator>();
-	linCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), z2z));//m2 is the master
+	linCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), QUNIT));//m2 is the master
 	linCT->Set_lin_offset(0.0);
 	system->AddLink(linCT);
 	auto legge1 = std::make_shared<ChFunction_Const>();
@@ -404,7 +401,7 @@ int main(int argc, char** argv) {
 										 auto mat_ter = std::make_shared<ChMaterialSurface>();
 										 mat_ter->SetFriction(friction_terrain);
 										 mat_ter->SetRestitution(restitution_terrain);
-										 mat_ter->SetCohesion(coh_force_terrain);
+										 mat_ter->SetCohesion(0.0);
 										 mat_ter->SetSpinningFriction(rolling_friction);
 										 mat_ter->SetRollingFriction(rolling_friction);
 
@@ -413,6 +410,44 @@ int main(int argc, char** argv) {
 										 break;
 	}
 	}
+	// -----------------------------------------------------------------------------------
+	// ---------------------------------Create terrain bodies-----------------------------
+	// -----------------------------------------------------------------------------------
+
+	// Create contact material for container, tube, funnel...
+	std::shared_ptr<ChMaterialSurfaceBase> material_body;
+
+	switch (method) {
+	case ChMaterialSurfaceBase::DEM: {
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+										 mat_ter->SetFriction(friction_terrain);
+										 mat_ter->SetRestitution(restitution_terrain);
+										 mat_ter->SetYoungModulus(Y_terrain);
+										 mat_ter->SetPoissonRatio(nu_terrain);
+										 mat_ter->SetAdhesion(0.0);
+										 mat_ter->SetKn(kn_terrain);
+										 mat_ter->SetGn(gn_terrain);
+										 mat_ter->SetKt(kt_terrain);
+										 mat_ter->SetGt(gt_terrain);
+
+										 material_body = mat_ter;
+
+										 break;
+	}
+	case ChMaterialSurfaceBase::DVI: {
+										 auto mat_ter = std::make_shared<ChMaterialSurface>();
+										 mat_ter->SetFriction(friction_terrain);
+										 mat_ter->SetRestitution(restitution_terrain);
+										 mat_ter->SetCohesion(0.0);
+										 mat_ter->SetSpinningFriction(rolling_friction);
+										 mat_ter->SetRollingFriction(rolling_friction);
+
+										 material_body = mat_ter;
+
+										 break;
+	}
+	}
+
 
 						// Create container body
 	auto container = std::shared_ptr<ChBody>(system->NewBody());
@@ -475,7 +510,7 @@ int main(int argc, char** argv) {
 	switch (workcase) {
 	case TestType::LAYER: {			
 								  // Create particles in layers until reaching the desired number of particles
-								  ChVector<> hdims(hdimX / 2 - r, hdimY / 2 - r, 0);
+								  ChVector<> hdims(hdimX / 4.35 - r, hdimY / 4.35 - r, 0);
 								  ChVector<> center(0, 0, 2 * r);
 
 								  for (int il = 0; il < num_layers; il++) {
@@ -494,8 +529,10 @@ int main(int argc, char** argv) {
 								   ChVector<> hdims(10 * r - r, 10 * r - r, 10 * r);
 								   ChVector<> center(0., 0., 50 * r + 25*r);//10r is the height of the funnel.
 
-								   CreateFunnel(system, container, material_terrain);
+								   CreateFunnel(system, container, material_body);
 								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);
+
+								   if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
 
 								  break;
 		}
@@ -512,7 +549,7 @@ int main(int argc, char** argv) {
 								  break;
 		}
 		case TestType::CASCADE: {	double time_hold = 2.0;
-									CreateTube(system, container, material_terrain, time_hold);
+									CreateTube(system, container, material_body, time_hold);
 
 									// Create particles in layers until reaching the desired number of particles
 									double r = 1.01 * radius_g;

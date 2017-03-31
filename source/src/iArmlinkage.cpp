@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
 #endif
 
 	// Set the gravity acceleration
-	system.Set_G_acc(ChVector<>(.0,.0,.0));
+	system.Set_G_acc(ChVector<>(.0,.0,-9.81));
 
 
 
@@ -536,7 +536,7 @@ int main(int argc, char* argv[]) {
 
 				// end test_law
 				lin_ch2lift->Set_lin_offset(.3);
-				//lin_ch2lift->Set_dist_funct(lift_law_test);
+				lin_ch2lift->Set_dist_funct(lift_law_test);
 				system.AddLink(lin_ch2lift);
 
 
@@ -557,7 +557,7 @@ int main(int argc, char* argv[]) {
 				tilt_law_test->Set_freq(.5);
 
 				// end test_law
-				lin_rod2link->Set_dist_funct(tilt_law_test);
+				//lin_rod2link->Set_dist_funct(tilt_law_test);
 				system.AddLink(lin_rod2link);
 
 // 4. Write the system hierarchy to the console (default log output destination)
@@ -580,7 +580,7 @@ system.ShowHierarchy(GetLog());
 	application->AddTypicalLogo();
 	application->AddTypicalSky();
 	application->AddTypicalLights();
-	application->AddTypicalCamera(core::vector3df(0,+3,6),core::vector3df(2, 0, 0)); //'camera' location            // "look at" location
+	application->AddTypicalCamera(core::vector3df(+2,+4,-3),core::vector3df(2, 0, 0)); //'camera' location            // "look at" location
 											   // Let the Irrlicht application convert the visualization assets.
 	application->AssetBindAll();
 	application->AssetUpdateAll();
