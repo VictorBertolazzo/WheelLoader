@@ -33,7 +33,7 @@
 #endif
 
 enum TestType {LAYER, FUNNEL, DROP, CASCADE};
-TestType workcase = TestType::LAYER;
+TestType workcase = TestType::FUNNEL;
 using namespace chrono;
 using namespace postprocess;
 
@@ -42,28 +42,32 @@ using namespace postprocess;
 
 const std::string out_dir = "../";
 const std::string pov_dir = out_dir + "/POVRAY";
+const std::string flatten = out_dir + "/funnel_DEMP_c10";
+const std::string flatten_track = "funnel_DEMP_c10";
+
 int out_fps = 60;
 
 using std::cout;
 using std::endl;
 
 int num_threads = 40;
-ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;
+ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
 // PovRay Output
 bool povray_output = false;
 // Material
 bool use_mat_properties = true;
 // Render 
-bool render = true;
+bool render = false;
 // Tracking Granule
 bool track_granule = false;
 // Roughness
 bool roughness = false;
 // Broad vs Narr
 bool broad_narr = true;
+// Tracking Flattening
+bool track_flatten = true;
 // --------------------------------------------------------------------------
 double radius_g = 0.01;
-double rolling_friction = 0.005 * radius_g;
 // --------------------------------------------------------------------------
 double r = 1.01 * radius_g;
 
@@ -81,7 +85,6 @@ double mass_g = rho_g * vol_g;
 ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
 int num_layers = 10;
 
-// Terrain contact DROP
 // Terrain contact properties---Default Ones are commented out.
 float friction_terrain = 0.7f;// 
 float restitution_terrain = 0.0f;
@@ -91,14 +94,12 @@ float kn_terrain = 1.0e4f;// 1.0e7f;
 float gn_terrain = 1.0e2f;
 float kt_terrain = 2.86e3f;// 2.86e6f;
 float gt_terrain = 1.0e2f;
-float coh_pressure_terrain = 0e2f;// 0e3f;
+float coh_pressure_terrain = 10.f;// 0e3f;
 float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
+float rolling_friction = 0.01 * radius_g;
 
-//// Estimates for number of bins for broad-phase
+//// Number of bins for broad-phase
 int factor = 2;
-//int binsX = (int)std::ceil(hdimX / radius_g) / factor;
-//int binsY = (int)std::ceil(hdimY / radius_g) / factor;
-//int binsZ = 20;
 int binsX = 10;
 int binsY = 10;
 int binsZ = 10;
@@ -131,7 +132,7 @@ void TimingHeader() {
 	printf("# BODIES |");
 	printf("# CONTACT|");
 	printf(" # ITERS |");
-	printf("\n\n");
+	printf("n\n");
 }
 
 void TimingOutput(chrono::ChSystem* mSys) {
@@ -212,7 +213,7 @@ int SpawnParticles(utils::Generator* gen) {
 
 	return gen->getTotalNumBodies();
 }
-// Funnel Generation , case::FUNNEL
+// Funnel Generation , case::FUNNEL, 7.2r m/s speed.
 void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
 	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(funnel);
@@ -254,7 +255,7 @@ void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, s
 	auto container2funnel = std::make_shared<ChLinkLinActuator>();
 	container2funnel->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
 	auto funnel_law = std::make_shared<ChFunction_Ramp>();
-	funnel_law->Set_ang(3.6*radius_g);// velocity of the funnel(10X test for simulation purposes).
+	funnel_law->Set_ang(7.2*radius_g);
 	container2funnel->Set_lin_offset(Vlength(container->GetPos() - funnel->GetPos()));
 	container2funnel->Set_dist_funct(funnel_law);
 	system->AddLink(container2funnel);
@@ -318,6 +319,17 @@ int main(int argc, char** argv) {
 			return 1;
 		}
 	}
+		if (track_flatten) {
+			if (ChFileutils::MakeDirectory(out_dir.c_str()) < 0) {
+				cout << "Error creating directory " << out_dir << endl;
+				return 1;
+			}
+			if (ChFileutils::MakeDirectory(flatten.c_str()) < 0) {
+				cout << "Error creating directory " << flatten << endl;
+				return 1;
+			}
+		}
+
 	// Get number of threads from arguments (if specified)
 	if (argc > 1) {
 		num_threads = std::stoi(argv[1]);
@@ -477,8 +489,7 @@ int main(int argc, char** argv) {
 	container->GetCollisionModel()->BuildModel();
 
 	if (roughness) {
-	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid
-	//	double spacing = 3.5 * radius_g;
+	// Adding a "roughness" to the terrain, consisting of sphere/capsule/ellipsoid grid--ENABLING AT THE TOP OF THE FILE.
 
 	for (int ix = -40; ix < 40; ix++) {
 		for (int iy = -40; iy < 40; iy++) {
@@ -506,6 +517,7 @@ int main(int argc, char** argv) {
 
 		double time_end = 4.50;
 		double time_step = 1e-4;
+		double time_to_plot = 0.;
 
 	switch (workcase) {
 	case TestType::LAYER: {			
@@ -532,6 +544,7 @@ int main(int argc, char** argv) {
 								   CreateFunnel(system, container, material_body);
 								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);
 
+								   time_to_plot = 1.75;
 								   if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
 
 								  break;
@@ -545,6 +558,7 @@ int main(int argc, char** argv) {
 								 unsigned int num_particles = gen.getTotalNumBodies();
 								 std::cout << "Generated particles:  " << num_particles << std::endl;
 								 time_end = 10.00;
+								 time_to_plot = 6.5;
 								 if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
 								  break;
 		}
@@ -568,7 +582,7 @@ int main(int argc, char** argv) {
 
 
 
-// BRAODPHASE UTILS
+			// BRAODPHASE UTILS--still not used--future task
 	vec3 bins = collision::function_Compute_Grid_Resolution(1000,real3(hdimX,hdimY,hdimZ),.1);
 
 	unsigned int num_particles = gen.getTotalNumBodies();
@@ -576,8 +590,8 @@ int main(int argc, char** argv) {
 
 	// If tracking a granule (roughly in the "middle of the pack"),
 	// grab a pointer to the tracked body and open an output file.
-	std::shared_ptr<ChBody> granule;  // tracked granule
-	std::ofstream outf;             // output file stream
+	std::shared_ptr<ChBody> granule;		// tracked granule
+	std::ofstream outf;						// output file stream
 
 	if (track_granule) {
 		int id = Id_g + num_particles -1;//Id_g + num_particles / 2;
@@ -593,6 +607,14 @@ int main(int argc, char** argv) {
 		outf.precision(7);
 		outf << std::scientific;
 	}
+			// Create a clone bodylist for extracting all bodies informations.
+	std::vector<std::shared_ptr<ChBody>> particlelist;
+	auto original_bodylist = system->Get_bodylist();
+	for (auto body = original_bodylist->begin(); body != original_bodylist->end(); ++body) {
+		auto mbody = std::shared_ptr<ChBody>(*body);
+		particlelist.push_back(mbody);
+	}
+	//particlelist.erase(particlelist.begin());// 
 
 #ifdef CHRONO_OPENGL
 	// -------------------------------
@@ -621,7 +643,6 @@ int main(int argc, char** argv) {
 	TimingHeader();
 
 
-	// Run simulation for specified time.
 	int out_steps = std::ceil((1.0 / time_step) / out_fps);
 
 	int sim_frame = 0;
@@ -630,44 +651,15 @@ int main(int argc, char** argv) {
 
 	ChFunction_Recorder mfun;
 	ChFunction_Recorder zfun;
+	ChFunction_Recorder bnfun;
 
 	double avkinenergy = 0.;
 	
 	
 
 	while (system->GetChTime() < time_end) {
+
 		system->DoStepDynamics(time_step);
-
-		if (workcase == DROP && sim_frame % (int)(.1/time_step) == 0 && system->GetChTime() < 6.00){
-			SpawnParticles(&gen);
-			if (broad_narr){// temp loc
-				int broad = system->data_manager->measures.collision.number_of_contacts_possible;
-				int narr = system->data_manager->num_rigid_contacts;
-				std::cout << "Potential Contacts : " << broad << " , Actual Contacts : " << narr << std::endl;
-			}
-		}
-
-
-		auto list = system->Get_bodylist();
-		std::vector<double> zs;
-		for (auto body = list->begin(); body != list->end(); ++body) {
-			//for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
-			auto mbody = std::shared_ptr<ChBody>(*body);
-			if (mbody->GetIdentifier() == -1 || mbody->GetIdentifier() == -2) {
-			}
-			else{
-				avkinenergy += ComputeKineticEnergy(mbody.get());
-				zs.push_back(mbody->GetPos().z());
-			}
-
-
-		}
-		//		avkinenergy /= particlelist.size();
-		avkinenergy /= list->size();
-		mfun.AddPoint(system->GetChTime(), avkinenergy);
-		auto biggest = std::max_element(std::begin(zs), std::end(zs));
-		zfun.AddPoint(system->GetChTime(), *biggest);
-		//TimingOutput(system);
 
 		cum_sim_time += system->GetTimerStep();
 		cum_broad_time += system->GetTimerCollisionBroad();
@@ -675,17 +667,94 @@ int main(int argc, char** argv) {
 		cum_solver_time += system->GetTimerSolver();
 		cum_update_time += system->GetTimerUpdate();
 
-		if (track_granule) {
-			assert(outf.is_open());
-			assert(granule);
-			const ChVector<>& pos = granule->GetPos();
-			const ChVector<>& vel = granule->GetPos_dt();
-			outf << system->GetChTime() << " ";
-			outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
-			outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
-			outf << vel.x() << " " << vel.y() << " " << vel.z();
-			outf << std::endl << std::flush;
+
+		// ------------------------OPTIONAL IF STATEMENT FUNCTIONS
+		// SPAWN PARTICLES-optional DROP case
+		if (workcase == DROP && sim_frame % (int)(.1 / time_step) == 0 && system->GetChTime() < 6.00){
+			SpawnParticles(&gen);
 		}
+
+				// ---------------------------PLOTTING-WRITING FUNCTIONS AFTER ASSESSMENT-------------------------------------------------- //
+		if (system->GetChTime() > time_to_plot){
+			// Perform Kinetic Energy and Maximum Height Detection
+			auto list = system->Get_bodylist();
+			std::vector<double> zs;
+			for (auto body = list->begin(); body != list->end(); ++body) {
+				//for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+				auto mbody = std::shared_ptr<ChBody>(*body);
+				if (mbody->GetIdentifier() == -1 || mbody->GetIdentifier() == -2) {
+				}
+				else{
+					avkinenergy += ComputeKineticEnergy(mbody.get());
+					zs.push_back(mbody->GetPos().z());
+				}
+
+
+			}
+			//		avkinenergy /= particlelist.size();
+			avkinenergy /= list->size();
+			mfun.AddPoint(system->GetChTime(), avkinenergy);
+			auto biggest = std::max_element(std::begin(zs), std::end(zs));
+			zfun.AddPoint(system->GetChTime(), *biggest);
+
+
+
+
+
+
+			// ------------------------OPTIONAL IF STATEMENT FUNCTIONS
+
+			// CALCULATE NARR/BROAD RATIO-if stat
+			if (broad_narr){// temp loc
+				int broad = system->data_manager->measures.collision.number_of_contacts_possible;
+				int narr = system->data_manager->num_rigid_contacts;
+					//std::cout << "Potential Contacts : " << broad << " , Actual Contacts : " << narr << std::endl;
+				bnfun.AddPoint(system->GetChTime(), (float) narr / broad);
+			}
+
+
+			// TRACK ALL THE GRANULES- optional
+			// Write a file each 60 time_steps(tunable) to 
+			if (track_flatten) 	{
+				//if (sim_frame == next_out_frame) {
+				if (sim_frame % out_steps == 0) {
+					std::ofstream outs;             // output file stream
+					char filename[100];
+					sprintf(filename, "../%s/data_%03d.dat", flatten_track.c_str(), out_frame + 1);
+					outs.open(filename, std::ios::out);
+					outs.precision(7);
+					outs << std::scientific;
+					for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
+						double x = (*body)->GetPos().x(); double y = (*body)->GetPos().y(); double z = (*body)->GetPos().z();
+						// no matter if one of the bodies is the terrain-Its erasing will be done offline
+						outs << x << "\t" << y << "\t" << z << endl;
+					}
+					outs.close();
+					out_frame++;
+					next_out_frame += out_steps;
+				}
+			}
+
+
+			// Track Single Granule-OPTIONAL
+			if (track_granule) {
+				assert(outf.is_open());
+				assert(granule);
+				const ChVector<>& pos = granule->GetPos();
+				const ChVector<>& vel = granule->GetPos_dt();
+				outf << system->GetChTime() << " ";
+				outf << system->GetNbodies() << " " << system->GetNcontacts() << " ";
+				outf << pos.x() << " " << pos.y() << " " << pos.z() << " ";
+				outf << vel.x() << " " << vel.y() << " " << vel.z();
+				outf << std::endl << std::flush;
+			}
+
+
+
+
+		}// All those actions takes place after "time_to_plot" simulation time.
+
+		// VISUALIZATION-OPTIONAL
 #ifdef CHRONO_OPENGL
 		if (render) {
 			opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
@@ -699,7 +768,13 @@ int main(int argc, char** argv) {
 #endif
 	
 		sim_frame++;
+		//TimingOutput(system);
+
 	}
+
+
+			// AFTER SIMULATION STUFFS
+
 	// Gnuplot
 	ChGnuPlot mplot("__tmp_gnuplot_4.gpl");
 	mplot.SetGrid();
@@ -709,6 +784,10 @@ int main(int argc, char** argv) {
 	zplot.SetGrid();
 	zplot.Plot(zfun, "Maximum particle height", " with lines lt -1 lc rgb'#00AAEE' ");
 	//
+	ChGnuPlot bnplot("__tmp_gnuplot_6.gpl");
+	bnplot.SetGrid();
+	bnplot.Plot(bnfun, "Narrow to Broad Phase collision contacts ratio.", " with lines lt -1 lc rgb'#00AAEE' ");
+	//
 	std::cout << std::endl;
 	std::cout << "Simulation time: " << cum_sim_time << std::endl;
 	std::cout << "    Broadphase:  " << cum_broad_time << std::endl;
@@ -717,6 +796,5 @@ int main(int argc, char** argv) {
 	std::cout << "    Update:      " << cum_update_time << std::endl;
 	std::cout << std::endl;
 	
-
 	return 0;
 }
