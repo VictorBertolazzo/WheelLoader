@@ -533,13 +533,16 @@ int main(int argc, char** argv) {
 								  hdims.y() -= 2 * r;
 								  // move the center abscissa by a 1*r 
 								  center.x() += r * pow(-1, il);
+								  if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
+
+
 	}
 
 		break;
 								}
 		case TestType::FUNNEL: {
 								   ChVector<> hdims(10 * r - r, 10 * r - r, 10 * r);
-								   ChVector<> center(0., 0., 50 * r + 25*r);//10r is the height of the funnel.
+								   ChVector<> center(0., 0., 52 * r + 25*r);//10r is the height of the funnel.
 
 								   CreateFunnel(system, container, material_body);
 								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);

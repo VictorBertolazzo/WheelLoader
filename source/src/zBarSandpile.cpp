@@ -1278,6 +1278,10 @@ int main(int argc, char** argv) {
 	char filename[100];
 
 
+	utils::WriteMeshPovray("boom_mod.obj","boom.inc","\..");
+	utils::WriteMeshPovray("bucket_mod.obj", "bucket.inc", "\..");
+
+
 	while (system->GetChTime() < time_end) {
 		if (povray_output){
 			if (step_number % render_step_size == 0) {
