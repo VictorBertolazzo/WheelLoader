@@ -1,7 +1,7 @@
 
 SET(MODELS
 #  cascading_packing_condition
-  central_pivot_mech
+#  central_pivot_mech
 #  demo_IRR_fel
 #  demo_PAR_friction
   demo_VEH_wheelloader
@@ -11,7 +11,7 @@ SET(MODELS
 #  test_granular_PAR_cyl
 #  test_granular_PAR_funnel
 #  test_granular_PAR_layer
-#  test_HYDR_actuator # future
+  test_HYDR_actuator # future
   test_mesh
   test_normal
   test_normal_PAR
