@@ -1,5 +1,10 @@
 // Vehicle Test
 // Victor Bertolazzo
+//    #define USE_PARALLEL
+	#define USE_SEQUENTIAL
+	//#define USE_PENALTY
+    //#define TEST_ENABLE
+	//#define USE_SEP_VEH
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -28,12 +33,16 @@
 #include "chrono/utils/ChUtilsGenerators.h"
 
 
+#include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicle.h"
 
 #include "chrono_models/vehicle/generic/Generic_Chassis.h"
 #include "chrono_models/vehicle/generic/Generic_Wheel.h"
 #include "chrono_models/vehicle/generic/Generic_Driveline2WD.h"//4wd
 #include "chrono_models/vehicle/generic/Generic_BrakeSimple.h"
 #include "chrono_models/vehicle/hmmwv/HMMWV_Driveline4WD.h"
+
+#include "chrono_models/vehicle/generic/Generic_SimplePowertrain.h"
+#include "chrono_models/vehicle/generic/Generic_RigidTire.h"
 
 #include "chrono_vehicle/ChApiVehicle.h"
 #include "chrono_vehicle/wheeled_vehicle/ChSteering.h"
@@ -45,19 +54,30 @@
 #include "chrono/assets/ChColorAsset.h"
 #include "chrono/assets/ChTexture.h"
 
+#include "chrono_vehicle/terrain/RigidTerrain.h"
+
+// If Irrlicht support is available...
+#ifdef CHRONO_IRRLICHT
+// ...include additional headers
+#include "chrono_vehicle/driver/ChIrrGuiDriver.h"
+#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleIrrApp.h"
+
+// ...and specify whether the demo should actually use Irrlicht
+#define USE_IRRLICHT
+#endif
+
 
 #ifdef CHRONO_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 
-//#define USE_PENALTY
 using namespace chrono;
 using namespace chrono::vehicle;
 using namespace chrono::vehicle::generic;
 using namespace chrono::vehicle::hmmwv;
 
 
-// Concrete class defining the WL steering mechanism
+// Concrete class defining another steering mechanism(so called center pivot)
 class CenterPivot : public ChSteering {
 	public:
 
@@ -239,7 +259,7 @@ public:
 	RigidAxle(const std::string& name) : ChSuspension(name) {}
 	~RigidAxle() {}
 
-	bool IsSteerable() const final override { return true; }
+	bool IsSteerable() const final override { return false; }
 	bool IsIndependent() const final override { return false; }
 
 	void Initialize(std::shared_ptr<ChBodyAuxRef> chassis,
@@ -340,7 +360,8 @@ public:
 			m_tierod[side]->SetInertiaXX(.01);
 		chassis->GetSystem()->AddBody(m_tierod[side]);
 
-		// Create and initialize the joint between knuckle and tierod (one side has universal, the other has spherical).
+		// Create and initialize the joint between knuckle and tierod (one side has universal, the other has spherical)
+				// TO DO.
 		m_sphericalTierod[side] = std::make_shared<ChLinkLockSpherical>();
 		m_sphericalTierod[side]->SetNameString(m_name + "_sphericalTierod" + suffix);
 		m_sphericalTierod[side]->Initialize(m_tierod[side], m_knuckle[side], ChCoordsys<>(points[TIEROD_K], QUNIT));
@@ -580,12 +601,211 @@ private:
 
 };
 
-bool render = true;
-int main(int argc, char* argv[]) {
-	// --------------------------
-	// Create system and set method-specific solver settings
-	// --------------------------
+// Concrete class defining the WL steering mechanism
+class PivotWL : public ChSteering{
+	public:
+		PivotWL(const std::string& name) : ChSteering(name) {}
+		~PivotWL() {}
+		
+		const double m_maxAngle = 40 * CH_C_DEG_TO_RAD; //40° rotation;
+		const double PivotWL::m_mass = 10; //total mass;
+		
+		void PivotWL::Initialize(std::shared_ptr<ChBodyAuxRef> chassis,
+			const ChVector<>& location,
+			const ChQuaternion<>& rotation) override
+		{}
+// funciton overload: it realizes a rotational engine link between chassis(front_body) and rear_body
+		void PivotWL::Initialize(std::shared_ptr<ChBodyAuxRef> chassis,
+			std::shared_ptr<ChBodyAuxRef> rear_body,
+			const ChVector<>& location,
+			const ChQuaternion<>& rotation)
+		{		
+			// Express the steering reference frame in the absolute coordinate system.
+			ChFrame<> steering_to_abs(location, rotation);
+			steering_to_abs.ConcatenatePreTransformation(chassis->GetFrame_REF_to_abs());
+			// Create and initialize the steering link body
+			ChVector<> link_local(0., .0, -0.02);
+			ChVector<> link_abs = steering_to_abs.TransformPointLocalToParent(link_local);
 
+			m_pivoting = std::make_shared<ChLinkEngine>();
+			m_pivoting->SetNameString(m_name + "_pivoting");
+			// z-dir default rev_joint dir-NO rotation needed
+			m_pivoting->Initialize(chassis, rear_body, ChCoordsys<>(link_abs, steering_to_abs.GetRot())); // it rotates about z axis of steering frame
+			m_pivoting->Set_shaft_mode(ChLinkEngine::ENG_SHAFT_LOCK);
+			m_pivoting->Set_eng_mode(ChLinkEngine::ENG_MODE_ROTATION);
+			chassis->GetSystem()->AddLink(m_pivoting);
+
+		}
+
+		void PivotWL::Synchronize(double time, double steering) override {
+			double angle = steering * GetMaxAngle();
+			if (auto fun = std::dynamic_pointer_cast<ChFunction_Const>(m_pivoting->Get_rot_funct()))
+				fun->Set_yconst(angle);
+
+		}
+		double PivotWL::GetMaxAngle() const { return m_maxAngle; }
+		void PivotWL::AddVisualizationAssets(chrono::vehicle::VisualizationType vis) override {
+			if (vis == chrono::vehicle::VisualizationType::NONE)
+				return;
+		}
+		void PivotWL::LogConstraintViolations() {
+			// Engine joint
+			{
+				ChMatrix<>* C = m_pivoting->GetC();
+				GetLog() << "Engine           ";
+				GetLog() << "  " << C->GetElement(0, 0) << "  ";
+				GetLog() << "  " << C->GetElement(1, 0) << "  ";
+				GetLog() << "  " << C->GetElement(2, 0) << "  ";
+				GetLog() << "  " << C->GetElement(3, 0) << "  ";
+				GetLog() << "  " << C->GetElement(4, 0) << "\n";
+			}
+
+		}
+		void PivotWL::RemoveVisualizationAssets(){
+
+		}
+		std::shared_ptr<ChBody> GetSteeringLink() const { return std::shared_ptr<ChBody>(); }
+		double PivotWL::GetMass() const { return m_mass; }
+
+protected:
+	std::shared_ptr<ChLinkEngine> m_pivoting;
+};
+
+// Concrete class for WheelLoader vehicle
+class WheelLoader_Vehicle : public chrono::vehicle::ChWheeledVehicle {
+public:
+	WheelLoader_Vehicle(
+		const bool fixed,
+		chrono::vehicle::SuspensionType suspType,
+		chrono::ChMaterialSurfaceBase::ContactMethod contactMethod = chrono::ChMaterialSurfaceBase::DVI)
+		:ChWheeledVehicle(contactMethod), m_suspType(suspType){
+
+		// Create the chassis subsystem
+		m_chassis = std::make_shared<Generic_Chassis>("Chassis");
+		// Create the rear body subsystem
+		m_rear = std::make_shared<ChBodyAuxRef>();
+		m_rear->SetName("RearBody");
+
+		// Create the suspension subsystems
+		m_suspensions.resize(2);
+			m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
+			m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
+		// Create the steering subsystem
+		//m_steerings.resize(1);//Unable to deal with ChSteeringList
+		m_steerings = std::make_shared<PivotWL>("Steering");
+		// Create the wheels
+		m_wheels.resize(4);
+		m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
+		m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
+		m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
+		m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
+		// Create the driveline
+		m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
+		// Create the brakes
+		m_brakes.resize(4);
+		m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
+		m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
+		m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
+		m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
+	}
+
+	~WheelLoader_Vehicle() {}
+
+	virtual int GetNumberAxles() const override { return 2; }
+
+	double GetSpringForce(const chrono::vehicle::WheelID& wheel_id) const;
+	double GetSpringLength(const chrono::vehicle::WheelID& wheel_id) const;
+	double GetSpringDeformation(const chrono::vehicle::WheelID& wheel_id) const;
+
+	double GetShockForce(const chrono::vehicle::WheelID& wheel_id) const;
+	double GetShockLength(const chrono::vehicle::WheelID& wheel_id) const;
+	double GetShockVelocity(const chrono::vehicle::WheelID& wheel_id) const;
+
+	void Initialize(const chrono::ChCoordsys<>& chassisPos, double chassisFwdVel = 0) override
+	{
+		m_chassis->Initialize(m_system, chassisPos, chassisFwdVel);
+
+		//check the transform
+		m_rear->SetCoord(chassisPos >> ChCoordsys<>(ChVector<>(-1.0,0.,0.),QUNIT));// Random pos for the rear body
+		m_rear->SetMass(m_chassis->GetMass()); m_rear->SetInertia(m_chassis->GetInertia());
+		m_system->Add(m_rear);
+		
+
+		m_steerings->Initialize(m_chassis->GetBody(), m_rear, ChVector<>(-.4, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
+
+		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_chassis->GetBody());
+		m_suspensions[1]->Initialize(m_rear, ChVector<>(-1.6914, 0, 0), m_rear);
+
+		m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
+		m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
+		m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
+		m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
+
+		std::vector<int> driven_susp(2);//(4WD)
+		driven_susp[0] = 0; driven_susp[1] = 1;
+		m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
+
+		m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
+		m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
+		m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
+		m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+	}
+
+	// Log debugging information
+	void LogHardpointLocations();  /// suspension hardpoints at design
+	void DebugLog(int what);       /// shock forces and lengths, constraints, etc.
+
+private:
+	chrono::vehicle::SuspensionType m_suspType;
+	std::shared_ptr<ChBodyAuxRef> m_rear;
+	//enum SuspensionType { RIGID_AXLE };
+	std::shared_ptr<PivotWL> m_steerings;
+
+};
+
+
+// =============================================================================
+bool render = true;
+// =============================================================================
+
+// Initial vehicle position
+ChVector<> initLoc(0, 0, 1.0);
+
+// Initial vehicle orientation
+ChQuaternion<> initRot(1, 0, 0, 0);
+// ChQuaternion<> initRot(0.866025, 0, 0, 0.5);
+// ChQuaternion<> initRot(0.7071068, 0, 0, 0.7071068);
+// ChQuaternion<> initRot(0.25882, 0, 0, 0.965926);
+// ChQuaternion<> initRot(0, 0, 0, 1);
+
+// Rigid terrain dimensions
+double terrainHeight = 0;
+double terrainLength = 100.0;  // size in X direction
+double terrainWidth = 100.0;   // size in Y direction
+
+// Simulation step size
+double step_size = 0.001;
+
+// Time interval between two render frames
+double render_step_size = 1.0 / 50;  // FPS = 50
+
+// Time interval between two output frames
+double output_step_size = 1.0 / 1;  // once a second
+
+#ifdef USE_IRRLICHT
+// Point on chassis tracked by the camera
+ChVector<> trackPoint(0.0, 0.0, 1.75);
+#else
+double tend = 20.0;
+
+const std::string out_dir = "../GENERIC_VEHICLE";
+const std::string pov_dir = out_dir + "/POVRAY";
+#endif
+
+
+int main(int argc, char* argv[]) {
+	
+#ifdef USE_PARALLEL
 	chrono::ChSystemParallel* system;
 
 #ifdef USE_PENALTY
@@ -624,80 +844,284 @@ int main(int argc, char* argv[]) {
 #pragma omp parallel
 #pragma omp master
 	{ std::cout << "Actual number of OpenMP threads: " << omp_get_num_threads() << std::endl; }
+#endif
 
-	///////////////////// -----------INITIAL TESTING PART----------------------
-		auto chass = std::shared_ptr<ChBodyAuxRef>(system->NewBodyAuxRef());
-		chass->SetBodyFixed(true);
-		system->Add(chass);
-
-		auto test = std::make_shared<CenterPivot>("Test");
-		test->Initialize(chass, ChVector<>(1.60, 0, -.0), QUNIT);
-		std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
-		std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
-		test->AddVisualizationAssets(VisualizationType::MESH);
+#ifdef TEST_ENABLE
+// First type of steering: useless.
+		//auto test = std::make_shared<CenterPivot>("Test");
+		//test->Initialize(chass, ChVector<>(1.60, 0, -.0), QUNIT);
+		//std::shared_ptr<ChBody> body = test->GetSteeringLink(LEFT);
+		//std::shared_ptr<ChBody> corpo = test->GetSteeringLink(RIGHT);
+		//test->AddVisualizationAssets(VisualizationType::MESH);
 
 
-		auto test1 = std::make_shared<RigidAxle>("Test_1");
-		test1->Initialize(chass, ChVector<>(1.6914,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
-		test1->AddVisualizationAssets(VisualizationType::MESH);
+		//auto test1 = std::make_shared<RigidAxle>("Test_1");
+		//test1->Initialize(chass, ChVector<>(1.6914,0.,0.), test->GetSteeringLink(LEFT), test->GetSteeringLink(RIGHT),0, 0);
+		//test1->AddVisualizationAssets(VisualizationType::MESH);
 
 		//auto test2 = std::make_shared<RigidAxle>("Test_2");
 		//test2->Initialize(chass, ChVector<>(1.6914, 0, 0), chass, 0, 0);
 		//test2->AddVisualizationAssets(VisualizationType::MESH);
 
-	//ChSuspensionList m_suspensions;
-	////std::vector<std::shared_ptr<RigidAxle>> m_suspensions;
-	//std::shared_ptr<CenterPivot> m_steerings;
-	//ChWheelList m_wheels;
-	//ChBrakeList m_brakes;
-	//std::shared_ptr<HMMWV_Driveline4WD> m_driveline;
+////////////////////-------------LAST TESTS---------------///////
 
-	//auto m_chassis = std::make_shared<Generic_Chassis>("Chassis");
-	////m_steerings.resize(1);
-	//m_steerings = std::make_shared<CenterPivot>("Steering");
-	//m_suspensions.resize(2);
-	//m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
-	//m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
-	//m_wheels.resize(4);
-	//m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
-	//m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
-	//m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
-	//m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
-	//m_brakes.resize(4);
-	//m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
-	//m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
-	//m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
-	//m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
-	//m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
+		// Pivot Steering: .
+		auto test00 = std::make_shared<PivotWL>("Test_00");
+		test00->Initialize(chass, rear, ChVector<>(1.60, 0, -.0), QUNIT);
+		test00->AddVisualizationAssets(VisualizationType::MESH);
+		// Rigid Axle
+		auto test01 = std::make_shared<RigidAxle>("Test_01");
+		test01->Initialize(chass, ChVector<>(1.6914, 0, 0), chass, 0, 0);
+		test01->AddVisualizationAssets(VisualizationType::MESH);
+		auto test02 = std::make_shared<RigidAxle>("Test_02");
+		test02->Initialize(rear, ChVector<>(1.6914, 0, 0), rear, 0, 0);
+		test02->AddVisualizationAssets(VisualizationType::MESH);
+#endif
+		
+#ifdef USE_SEP_VEH
+	ChSuspensionList m_suspensions;
+	//std::vector<std::shared_ptr<RigidAxle>> m_suspensions;
+	std::shared_ptr<PivotWL> m_steerings;
+	ChWheelList m_wheels;
+	ChBrakeList m_brakes;
+	std::shared_ptr<HMMWV_Driveline4WD> m_driveline;
 
-	//m_chassis->Initialize(system, ChCoordsys<>(VNULL,QUNIT), 0.);
-	//m_steerings->Initialize(m_chassis->GetBody(), ChVector<>(1.60, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
-	//m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink(LEFT), m_steerings->GetSteeringLink(RIGHT), 0, 0);
-	//m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6865, 0, 0), m_chassis->GetBody(),0,0);
-	//m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
-	//m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
-	//m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
-	//m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
-	//m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
-	//m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
-	//m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
-	//m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+	auto m_chassis = std::make_shared<Generic_Chassis>("Chassis");
+	//m_steerings.resize(1);
+	m_steerings = std::make_shared<PivotWL>("Steering");
+	m_suspensions.resize(2);
+	m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
+	m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
+	m_wheels.resize(4);
+	m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
+	m_wheels[1] = std::make_shared<Generic_Wheel>("Wheel_FR");
+	m_wheels[2] = std::make_shared<Generic_Wheel>("Wheel_RL");
+	m_wheels[3] = std::make_shared<Generic_Wheel>("Wheel_RR");
+	m_brakes.resize(4);
+	m_brakes[0] = std::make_shared<Generic_BrakeSimple>("Brake_FL");
+	m_brakes[1] = std::make_shared<Generic_BrakeSimple>("Brake_FR");
+	m_brakes[2] = std::make_shared<Generic_BrakeSimple>("Brake_RL");
+	m_brakes[3] = std::make_shared<Generic_BrakeSimple>("Brake_RR");
+	m_driveline = std::make_shared<HMMWV_Driveline4WD>("driveline");
 
-	//std::vector<int> driven_susp(0, 1);
-	//m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
+	m_chassis->Initialize(system, ChCoordsys<>(VNULL,QUNIT), 0.);
+	m_steerings->Initialize(m_chassis->GetBody(), rear, ChVector<>(1.60, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
+	m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_chassis->GetBody(), 0, 0);
+	m_suspensions[1]->Initialize(rear, ChVector<>(-1.6865, 0, 0), rear,0,0);
+	m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
+	m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
+	m_wheels[2]->Initialize(m_suspensions[1]->GetSpindle(LEFT));
+	m_wheels[3]->Initialize(m_suspensions[1]->GetSpindle(RIGHT));
+	m_brakes[0]->Initialize(m_suspensions[0]->GetRevolute(LEFT));
+	m_brakes[1]->Initialize(m_suspensions[0]->GetRevolute(RIGHT));
+	m_brakes[2]->Initialize(m_suspensions[1]->GetRevolute(LEFT));
+	m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
+
+	std::vector<int> driven_susp(2);//(4WD)
+	driven_susp[0] = 0; driven_susp[1] = 1;
+	m_driveline->Initialize(m_chassis->GetBody(), m_suspensions, driven_susp);
+#endif
+
+
+
+	WheelLoader_Vehicle vehicle(true, SuspensionType::MULTI_LINK);// to fix
+	vehicle.Initialize(ChCoordsys<>(initLoc + ChVector<>(0, 0, .0), initRot));
+	vehicle.SetChassisVisualizationType(VisualizationType::PRIMITIVES);
+	vehicle.SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);
+	vehicle.SetSteeringVisualizationType(VisualizationType::NONE);
+	vehicle.SetWheelVisualizationType(VisualizationType::PRIMITIVES);
+
+	// Create the terrain
+	RigidTerrain terrain(vehicle.GetSystem());
+	terrain.SetContactFrictionCoefficient(0.9f);
+	terrain.SetContactRestitutionCoefficient(0.01f);
+	terrain.SetContactMaterialProperties(2e7f, 0.3f);
+	terrain.SetColor(ChColor(0.5f, 0.5f, 1));
+	terrain.SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+	terrain.Initialize(terrainHeight, terrainLength, terrainWidth);
+
+
+////////////-----------------------------------------//////////////////////
+
+	// Create and initialize the powertrain system
+	Generic_SimplePowertrain powertrain;
+
+	powertrain.Initialize(vehicle.GetChassisBody(), vehicle.GetDriveshaft());
+
+	// Create the tires
+	Generic_RigidTire tire_front_left("FL");
+	Generic_RigidTire tire_front_right("FR");
+	Generic_RigidTire tire_rear_left("RL");
+	Generic_RigidTire tire_rear_right("RR");
+
+	tire_front_left.Initialize(vehicle.GetWheelBody(FRONT_LEFT), LEFT);
+	tire_front_right.Initialize(vehicle.GetWheelBody(FRONT_RIGHT), RIGHT);
+	tire_rear_left.Initialize(vehicle.GetWheelBody(REAR_LEFT), LEFT);
+	tire_rear_right.Initialize(vehicle.GetWheelBody(REAR_RIGHT), RIGHT);
+
+	tire_front_left.SetVisualizationType(VisualizationType::PRIMITIVES);
+	tire_front_right.SetVisualizationType(VisualizationType::PRIMITIVES);
+	tire_rear_left.SetVisualizationType(VisualizationType::PRIMITIVES);
+	tire_rear_right.SetVisualizationType(VisualizationType::PRIMITIVES);
+
+
+
+
+	vehicle.GetSystem()->ShowHierarchy(GetLog());
+
+
+
+
+
+
+
+
+#ifdef USE_IRRLICHT
+	ChWheeledVehicleIrrApp app(&vehicle, &powertrain, L"Articulated Vehicle Demo");
+
+	app.SetSkyBox();
+	app.AddTypicalLights(irr::core::vector3df(30.f, -30.f, 100.f), irr::core::vector3df(30.f, 50.f, 100.f), 250, 130);
+	app.SetChaseCamera(trackPoint, 6.0, 0.5);
+
+	app.SetTimestep(step_size);
+
+	app.AssetBindAll();
+	app.AssetUpdateAll();
+
+	ChIrrGuiDriver driver(app);
+
+	// Set the time response for steering and throttle keyboard inputs.
+	// NOTE: this is not exact, since we do not render quite at the specified FPS.
+	double steering_time = 1.0;  // time to go from 0 to +1 (or from 0 to -1)
+	double throttle_time = 1.0;  // time to go from 0 to +1
+	double braking_time = 0.3;   // time to go from 0 to +1
+	driver.SetSteeringDelta(render_step_size / steering_time);
+	driver.SetThrottleDelta(render_step_size / throttle_time);
+	driver.SetBrakingDelta(render_step_size / braking_time);
+
+#else
+	Generic_FuncDriver driver(vehicle);
+#endif
+
+	driver.Initialize();
+
+
+	// Inter-module communication data
+	TireForces tire_forces(4);
+	TireForces tr_tire_forces(4);
+	WheelState wheel_states[4];
+	double driveshaft_speed;
+	double powertrain_torque;
+	double throttle_input;
+	double steering_input;
+	double braking_input;
+
+	// Number of simulation steps between two 3D view render frames
+	int render_steps = (int)std::ceil(render_step_size / step_size);
+
+	// Number of simulation steps between two output frames
+	int output_steps = (int)std::ceil(output_step_size / step_size);
+
+	// Initialize simulation frame counter and simulation time
+	int step_number = 0;
+	double time = 0;
+
+#ifdef USE_IRRLICHT
+
+	ChRealtimeStepTimer realtime_timer;
+
+	while (app.GetDevice()->run()) {
+		// Render scene
+		if (step_number % render_steps == 0) {
+			app.BeginScene(true, true, irr::video::SColor(255, 140, 161, 192));
+			app.DrawAll();
+			app.EndScene();
+		}
+
+#ifdef DEBUG_LOG
+		if (step_number % output_steps == 0) {
+			GetLog() << "\n\n============ System Information ============\n";
+			GetLog() << "Time = " << time << "\n\n";
+			vehicle.DebugLog(DBG_SPRINGS | DBG_SHOCKS | DBG_CONSTRAINTS);
+		}
+#endif
+
+		// Collect output data from modules (for inter-module communication)
+		throttle_input = driver.GetThrottle();
+		steering_input = driver.GetSteering();
+		braking_input = driver.GetBraking();
+
+		powertrain_torque = powertrain.GetOutputTorque();
+
+		tire_forces[FRONT_LEFT.id()] = tire_front_left.GetTireForce();
+		tire_forces[FRONT_RIGHT.id()] = tire_front_right.GetTireForce();
+		tire_forces[REAR_LEFT.id()] = tire_rear_left.GetTireForce();
+		tire_forces[REAR_RIGHT.id()] = tire_rear_right.GetTireForce();
+
+
+		driveshaft_speed = vehicle.GetDriveshaftSpeed();
+
+		wheel_states[FRONT_LEFT.id()] = vehicle.GetWheelState(FRONT_LEFT);
+		wheel_states[FRONT_RIGHT.id()] = vehicle.GetWheelState(FRONT_RIGHT);
+		wheel_states[REAR_LEFT.id()] = vehicle.GetWheelState(REAR_LEFT);
+		wheel_states[REAR_RIGHT.id()] = vehicle.GetWheelState(REAR_RIGHT);
+
+		// Update modules (process inputs from other modules)
+		time = vehicle.GetSystem()->GetChTime();
+
+		driver.Synchronize(time);
+
+		terrain.Synchronize(time);
+
+		tire_front_left.Synchronize(time, wheel_states[FRONT_LEFT.id()], terrain);
+		tire_front_right.Synchronize(time, wheel_states[FRONT_RIGHT.id()], terrain);
+		tire_rear_left.Synchronize(time, wheel_states[REAR_LEFT.id()], terrain);
+		tire_rear_right.Synchronize(time, wheel_states[REAR_RIGHT.id()], terrain);
+
+		powertrain.Synchronize(time, throttle_input, driveshaft_speed);
+
+		vehicle.Synchronize(time, steering_input, braking_input, powertrain_torque, tire_forces);
+
+		app.Synchronize(driver.GetInputModeAsString(), steering_input, throttle_input, braking_input);
+
+		// Advance simulation for one timestep for all modules
+		double step = realtime_timer.SuggestSimulationStep(step_size);
+
+		driver.Advance(step);
+
+		terrain.Advance(step);
+
+		tire_front_right.Advance(step);
+		tire_front_left.Advance(step);
+		tire_rear_right.Advance(step);
+		tire_rear_left.Advance(step);
+
+		powertrain.Advance(step);
+
+		vehicle.Advance(step);
+
+		app.Advance(step);
+
+		// Increment frame number
+		step_number++;
+	}
+#endif
+
+
+#ifdef USE_PARALLEL
 
 #ifdef CHRONO_OPENGL
 	if (render) {
 		opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
-		gl_window.Initialize(1280, 720, "Sandpile + zBar", system);
-		gl_window.SetCamera(ChVector<>(2, 2, 0), ChVector<>(3.5, 0, 0), ChVector<>(0, 0, 1));
+		gl_window.Initialize(1280, 720, "demo_vehicle_WheelLoader", vehicle.GetSystem());
+		gl_window.SetCamera(ChVector<>(100, 100, 100), ChVector<>(0, 0, 0), ChVector<>(0, 0, 1));
 		gl_window.SetRenderMode(opengl::SOLID);
 	}
 #endif
 
 
-	while (system->GetChTime() < 500000.00) {
-		system->DoStepDynamics(.01);
+	while (vehicle.GetSystem()->GetChTime() < 500000.00) {
+		vehicle.GetSystem()->DoStepDynamics(.01);
 
 #ifdef CHRONO_OPENGL
 		if (render) {
@@ -711,8 +1135,7 @@ int main(int argc, char* argv[]) {
 		}
 #endif
 	}
-
-	return 0;
+#endif // USE_PARALLEL
 
 	return 0;
 }
