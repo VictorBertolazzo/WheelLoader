@@ -1,3 +1,6 @@
+// This example computes a double integration on the input pressure function for the displacement-driven pistons.
+// It must be merged with hydraulic_force.cpp file
+// Victor Bertolazzo
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -27,6 +30,7 @@
 
 #include "chrono_postprocess/ChGnuPlot.h"
 
+#define USE_DISPLACEMENT
 
 #ifdef CHRONO_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
@@ -67,33 +71,44 @@ int main(int argc, char** argv) {
 	chrono::ChSystemParallel* system;
 
 	//---Function Creation--//
+	 // Pressure function means the differences (pHead*aHead-pRod*Arod) weighted by *1/m_pist
+	 // Are all these data available? Yes
 	auto pressure = std::make_shared<ChFunction_Recorder>();
 	for (int i = 0; i < 10; i++){ pressure->AddPoint(i, 1.); }
 
 	// Assuming pres_funct is of type ChFunction_Recorder
 	double xmin = 0;
-	double xmax = 0;
+	double xmax = 15;
 	pressure->Estimate_x_range(xmin, xmax);// double& x
+	ChFunction_Integrate fun;
+	fun.Set_order(2); fun.Set_x_start(xmin); fun.Set_x_end(xmax);
+	fun.Set_num_samples(10); fun.Set_C_start(0.);
+	fun.Set_fa(pressure);
+	fun.ComputeIntegral();
 
-	ChFunction_Recorder speed;
-	double h = 1;//0
-	double p = 0;
-	//for (int i = 0; i < 101; i++){
-	//	double h = i*(xmax - xmin) / 100;
+	auto speed = std::make_shared<ChFunction_Recorder>();
+	for (int i = 0; i < 101; i++){
+		double h = i*(xmax - xmin) / 100;
+		speed->AddPoint(xmin + h, fun.Get_y(xmin + h));//I'd want to access to array_x(row last, column 0) member
+}
 
-		ChFunction_Integrate fun;
-		fun.Set_order(2); fun.Set_x_start(xmin + p); fun.Set_x_end(xmin + h);
-		fun.Set_num_samples(10); fun.Set_C_start(0.);
-		fun.Set_fa(pressure);
-		fun.ComputeIntegral();
-		speed.AddPoint(xmin + h, fun.Get_y(xmin + p));//I'd want to access to array_x(row last, column 0) member
-		p = h;
-	//}
+	speed->Estimate_x_range(xmin, xmax);// double& x
+	ChFunction_Integrate speed_fun;
+	speed_fun.Set_order(2); speed_fun.Set_x_start(xmin); speed_fun.Set_x_end(xmax);
+	speed_fun.Set_num_samples(10); speed_fun.Set_C_start(0.);
+	speed_fun.Set_fa(speed);
+	speed_fun.ComputeIntegral();
+
+	ChFunction_Recorder pos;
+	for (int i = 0; i < 101; i++){
+		double h = i*(xmax - xmin) / 100;
+		pos.AddPoint(xmin + h, speed_fun.Get_y(xmin + h));//I'd want to access to array_x(row last, column 0) member
+	}
 
 	// Gnuplot
 	ChGnuPlot mplot("__tmp_gnuplot_4.gpl");
 	mplot.SetGrid();
-	mplot.Plot(speed, "Actuator Displacement Function", " with lines lt -1 lc rgb'#00AAEE' ");
+	mplot.Plot(pos, "Actuator Displacement Function", " with lines lt -1 lc rgb'#00AAEE' ");
 
 
 	// Sanity check: print number of threads in a parallel region
