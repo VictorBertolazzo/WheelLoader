@@ -44,6 +44,9 @@
 #include "chrono_models/vehicle/generic/Generic_SimplePowertrain.h"
 #include "chrono_models/vehicle/generic/Generic_RigidTire.h"
 
+#include "chrono_models/vehicle/generic/Generic_RackPinion.h"
+#include "chrono_models/vehicle/generic/Generic_DoubleWishbone.h"
+
 #include "chrono_vehicle/ChApiVehicle.h"
 #include "chrono_vehicle/wheeled_vehicle/ChSteering.h"
 
@@ -351,21 +354,27 @@ public:
 			m_spindle[side]->SetInertiaXX(.01);
 		chassis->GetSystem()->AddBody(m_spindle[side]);
 
-		// Create and initialize the tierod body.
-		m_tierod[side] = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
-		m_tierod[side]->SetNameString(m_name + "_tierod" + suffix);
-		m_tierod[side]->SetPos((points[TIEROD_K]) / 2 + (points[TIEROD_S]) / 2);
-		m_tierod[side]->SetRot(chassis->GetFrame_REF_to_abs().GetRot());
-			m_tierod[side]->SetMass(.01);
-			m_tierod[side]->SetInertiaXX(.01);
-		chassis->GetSystem()->AddBody(m_tierod[side]);
+		////// Create and initialize the tierod body.
+		////m_tierod[side] = std::shared_ptr<ChBody>(chassis->GetSystem()->NewBody());
+		////m_tierod[side]->SetNameString(m_name + "_tierod" + suffix);
+		////m_tierod[side]->SetPos((points[TIEROD_K]) / 2 + (points[TIEROD_S]) / 2);
+		////m_tierod[side]->SetRot(chassis->GetFrame_REF_to_abs().GetRot());
+		////	m_tierod[side]->SetMass(.01);
+		////	m_tierod[side]->SetInertiaXX(.01);
+		////chassis->GetSystem()->AddBody(m_tierod[side]);
 
-		// Create and initialize the joint between knuckle and tierod (one side has universal, the other has spherical)
-				// TO DO.
-		m_sphericalTierod[side] = std::make_shared<ChLinkLockSpherical>();
-		m_sphericalTierod[side]->SetNameString(m_name + "_sphericalTierod" + suffix);
-		m_sphericalTierod[side]->Initialize(m_tierod[side], m_knuckle[side], ChCoordsys<>(points[TIEROD_K], QUNIT));
-		chassis->GetSystem()->AddLink(m_sphericalTierod[side]);
+					//---NEW--- Create and initialize the tierod distance constraint between chassis and upright.
+		m_distTierod[side] = std::make_shared<ChLinkDistance>();
+		m_distTierod[side]->SetNameString(m_name + "_distTierod" + suffix);
+		m_distTierod[side]->Initialize(tierod_body, m_knuckle[side], false, points[TIEROD_C], points[TIEROD_U]);
+		chassis->GetSystem()->AddLink(m_distTierod[side]);
+
+		////// Create and initialize the joint between knuckle and tierod (one side has universal, the other has spherical)
+		////		// TO DO.
+		////m_sphericalTierod[side] = std::make_shared<ChLinkLockSpherical>();
+		////m_sphericalTierod[side]->SetNameString(m_name + "_sphericalTierod" + suffix);
+		////m_sphericalTierod[side]->Initialize(m_tierod[side], m_knuckle[side], ChCoordsys<>(points[TIEROD_K], QUNIT));
+		////chassis->GetSystem()->AddLink(m_sphericalTierod[side]);
 
 		// Create and initialize the revolute joint between --CHASSIS-- and knuckle.
 			// Using CompositeInertia() function later on.
@@ -384,12 +393,12 @@ public:
 			chassis, m_knuckle[side], ChCoordsys<>((points[KNUCKLE_U] + points[KNUCKLE_L]) / 2, rot.Get_A_quaternion()));
 		chassis->GetSystem()->AddLink(m_revoluteKingpin[side]);
 
-		// Create and initialize the spherical joint between steering mechanism and tierod.
-			// Even tierod body has two left/right part for center pivot.
-		m_sphericalSteering[side] = std::make_shared<ChLinkLockSpherical>();
-		m_sphericalSteering[side]->SetNameString(m_name + "_sphericalSteering" + suffix);
-		m_sphericalSteering[side]->Initialize(m_tierod[side], tierod_body, ChCoordsys<>(points[TIEROD_S], QUNIT));
-		chassis->GetSystem()->AddLink(m_sphericalSteering[side]);
+		////// Create and initialize the spherical joint between steering mechanism and tierod.
+		////	// Even tierod body has two left/right part for center pivot.
+		////m_sphericalSteering[side] = std::make_shared<ChLinkLockSpherical>();
+		////m_sphericalSteering[side]->SetNameString(m_name + "_sphericalSteering" + suffix);
+		////m_sphericalSteering[side]->Initialize(m_tierod[side], tierod_body, ChCoordsys<>(points[TIEROD_S], QUNIT));
+		////chassis->GetSystem()->AddLink(m_sphericalSteering[side]);
 
 		// Create and initialize the revolute joint between upright and spindle.
 		ChCoordsys<> rev_csys(points[SPINDLE], chassisRot * Q_from_AngAxis(CH_C_PI / 2.0, VECT_X));
@@ -419,8 +428,13 @@ public:
 			return;
 
 
-		AddVisualizationLink(m_tierod[LEFT], m_pointsL[TIEROD_S], m_pointsL[TIEROD_K], getTierodRadius(), ChColor(0.7f, 0.7f, 0.2f));
-		AddVisualizationLink(m_tierod[RIGHT], m_pointsR[TIEROD_S], m_pointsR[TIEROD_K], getTierodRadius(), ChColor(0.7f, 0.7f, 0.2f));
+		//AddVisualizationLink(m_tierod[LEFT], m_pointsL[TIEROD_S], m_pointsL[TIEROD_K], getTierodRadius(), ChColor(0.7f, 0.7f, 0.2f));
+		//AddVisualizationLink(m_tierod[RIGHT], m_pointsR[TIEROD_S], m_pointsR[TIEROD_K], getTierodRadius(), ChColor(0.7f, 0.7f, 0.2f));
+					//---NEW--- Add visualization for the tie-rods
+		m_distTierod[LEFT]->AddAsset(std::make_shared<ChPointPointSegment>());
+		m_distTierod[RIGHT]->AddAsset(std::make_shared<ChPointPointSegment>());
+		m_distTierod[LEFT]->AddAsset(std::make_shared<ChColorAsset>(0.8f, 0.3f, 0.3f));
+		m_distTierod[RIGHT]->AddAsset(std::make_shared<ChColorAsset>(0.8f, 0.3f, 0.3f));
 
 
 		AddVisualizationKnuckle(m_knuckle[LEFT], m_pointsL[KNUCKLE_U], m_pointsL[KNUCKLE_L], m_pointsL[TIEROD_K],
@@ -528,6 +542,8 @@ protected:
 		DRAGLINK_C,         ///< draglink, chassis
 		TIEROD_CM,
 		TIEROD_S,
+		TIEROD_C,  ///< tierod, chassis
+		TIEROD_U,  ///< tierod, upright
 		NUM_POINTS
 	};
 	const ChVector<> getLocation(PointId which) {
@@ -574,6 +590,11 @@ protected:
 			return ChVector<>(0, 0.425, -0.05);
 		case TIEROD_S:
 			return ChVector<>(-.175, 0.45, -0.02);
+		case TIEROD_C:
+			return 0.0254 * ChVector<>(-9.855, 17.655, 2.135);
+		case TIEROD_U:
+			return 0.0254 * ChVector<>(-6.922, 32.327, -0.643);
+
 		default:
 			return ChVector<>(0, 0, 0);
 		}
@@ -594,6 +615,7 @@ private:
 	std::shared_ptr<ChLinkLockRevolute> m_revoluteKingpin[2];
 	std::shared_ptr<ChLinkLockSpherical> m_sphericalSteering[2];
 	//std::shared_ptr<ChLinkLockRevolute> m_revolute[2];
+	std::shared_ptr<ChLinkDistance> m_distTierod[2];
 
 	//std::shared_ptr<ChShaft> m_axle[2];
 	//std::shared_ptr<ChShaftsBody> m_axle_to_spindle[2];
@@ -671,6 +693,9 @@ protected:
 	std::shared_ptr<ChLinkEngine> m_pivoting;
 };
 
+#define USE_RACKPIN		// Flag to test RigidAxle suspension with a classical steering mechanism
+#define USE_STEERLIST	// Flag to decide whether to use ChSteeringList or not()
+
 // Concrete class for WheelLoader vehicle
 class WheelLoader_Vehicle : public chrono::vehicle::ChWheeledVehicle {
 public:
@@ -682,17 +707,32 @@ public:
 
 		// Create the chassis subsystem
 		m_chassis = std::make_shared<Generic_Chassis>("Chassis");
+
+#ifdef USE_RACKPIN
+	#ifdef USE_STEERLIST
+		m_steerings.resize(1);
+		m_steerings[0] = std::make_shared<Generic_RackPinion>("Steering");
+	#else
+		m_steerings = std::make_shared<Generic_RackPinion>("Steering");
+
+	#endif
+
+#else
 		// Create the rear body subsystem
 		m_rear = std::make_shared<ChBodyAuxRef>();
 		m_rear->SetName("RearBody");
-
-		// Create the suspension subsystems
-		m_suspensions.resize(2);
-			m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
-			m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
 		// Create the steering subsystem
 		//m_steerings.resize(1);//Unable to deal with ChSteeringList
 		m_steerings = std::make_shared<PivotWL>("Steering");
+
+#endif
+		
+		// Create the suspension subsystems--RigidAxle
+		m_suspensions.resize(2);
+			m_suspensions[0] = std::make_shared<Generic_DoubleWishboneFront>("FrontSusp");
+			m_suspensions[1] = std::make_shared<Generic_DoubleWishboneRear>("RearSusp");
+		
+
 		// Create the wheels
 		m_wheels.resize(4);
 		m_wheels[0] = std::make_shared<Generic_Wheel>("Wheel_FL");
@@ -725,16 +765,32 @@ public:
 	{
 		m_chassis->Initialize(m_system, chassisPos, chassisFwdVel);
 
+#ifdef USE_RACKPIN
+		ChVector<> offset(1.60, 0, -0.07);
+
+		#ifdef USE_STEERLIST
+		m_steerings[0]->Initialize(m_chassis->GetBody(), offset, ChQuaternion<>(1, 0, 0, 0));
+		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings[0]->GetSteeringLink());
+		#else
+		m_steerings->Initialize(m_chassis->GetBody(), offset, ChQuaternion<>(1, 0, 0, 0));
+		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink());
+		#endif // USE_STEERLIST
+
+		m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6914, 0, 0), m_chassis->GetBody());
+
+#else
 		//check the transform
 		m_rear->SetCoord(chassisPos >> ChCoordsys<>(ChVector<>(-1.0,0.,0.),QUNIT));// Random pos for the rear body
 		m_rear->SetMass(m_chassis->GetMass()); m_rear->SetInertia(m_chassis->GetInertia());
 		m_system->Add(m_rear);
-		
-
 		m_steerings->Initialize(m_chassis->GetBody(), m_rear, ChVector<>(-.4, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
-
 		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_chassis->GetBody());
 		m_suspensions[1]->Initialize(m_rear, ChVector<>(-1.6914, 0, 0), m_rear);
+		
+
+#endif //USE_RACKPIN
+
+		
 
 		m_wheels[0]->Initialize(m_suspensions[0]->GetSpindle(LEFT));
 		m_wheels[1]->Initialize(m_suspensions[0]->GetSpindle(RIGHT));
@@ -759,7 +815,17 @@ private:
 	chrono::vehicle::SuspensionType m_suspType;
 	std::shared_ptr<ChBodyAuxRef> m_rear;
 	//enum SuspensionType { RIGID_AXLE };
+#ifdef USE_RACKPIN
+	#ifdef USE_STEERLIST
+
+	#else
+	std::shared_ptr<Generic_RackPinion> m_steerings;
+	#endif
+#else
 	std::shared_ptr<PivotWL> m_steerings;
+
+#endif //USE_RACKPIN
+
 
 };
 
