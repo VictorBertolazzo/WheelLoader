@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
 		ReadFile(act_input, input);
 		for (int i = 0; i < input.size(); i++){
 					// scalar gain to be observable in simulation
-			pressure.AddPoint(input[i].mt, 5 *input[i].mv);}
+			pressure.AddPoint(input[i].mt, 10 *input[i].mv);}
 						}
 	else if(mode == INPLACE){
 		ChFunction_Sine pressure;
@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
 	system->AddLink(prismatic);
 
 	//Setup the function--Old
-	{
+	
 		auto pres_function = std::make_shared<ChFunction_Recorder>();//shared_ptr gives memory acces violation in AddPoint member
 		if (mode == INFILE){
 			ReadFile(act_input, input);
@@ -272,8 +272,9 @@ int main(int argc, char** argv) {
 				pres_function->AddPoint(input[i].mt, input[i].mv);
 			}
 		}
-	}
+	
 
+//#define USE_DISPLACEMENT
 	// Choose between the two type of connections: check distances and orientations
 #ifdef USE_DISPLACEMENT
 	auto linAB = std::make_shared<ChLinkLinActuator>(); 
@@ -299,10 +300,10 @@ int main(int argc, char** argv) {
 
 	// Simulation
 
-	while (system->GetChTime() < 50000000.) {
+	while (system->GetChTime() < 5.) {
 
 		system->DoStepDynamics(.001);
-		//std::cout << bodyB->GetPos().x() << std::endl;
+		std::cout << bodyB->GetPos().x() << std::endl;
 
 #ifdef CHRONO_OPENGL
 		if (render) {
