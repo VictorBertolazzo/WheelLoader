@@ -22,13 +22,6 @@
 
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/solver/ChIterativeSolverParallel.h"
-
-#ifdef CHRONO_OPENGL
-#include "chrono_opengl/ChOpenGLWindow.h"
-#endif
-
-using namespace chrono;
-using namespace chrono::collision;
 #include "chrono/core/ChLog.h"
 #include "chrono/core/ChVectorDynamic.h"
 #include "chrono/motion_functions/ChFunction_Recorder.h"
@@ -36,11 +29,17 @@ using namespace chrono::collision;
 
 #include "chrono_postprocess/ChGnuPlot.h"
 
+#ifdef CHRONO_OPENGL
+#include "chrono_opengl/ChOpenGLWindow.h"
+#endif
+
+using namespace chrono;
+using namespace chrono::collision;
 using namespace postprocess;
 
 
 // --------------------------------------------------------------------------
-
+//#define USE_SINGLE_SPHERE
 
 void TimingOutput(chrono::ChSystem* mSys) {
 	double TIME = mSys->GetChTime();
@@ -105,7 +104,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rollfr = 0.01 * radius_g;
+	double rolling_friction = 0.1 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -162,15 +161,10 @@ int main(int argc, char** argv) {
 	float coh_pressure_terrain = 0e4f;// 0e3f;
 	float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
 
-	// Estimates for number of bins for broad-phase
-	int factor = 2;
-	int binsX = (int)std::ceil(hdimX / radius_g) / factor;
-	int binsY = (int)std::ceil(hdimY / radius_g) / factor;
-	int binsZ = 1;
-
-    binsX = 10;
-    binsY = 10;
-    binsZ = 10;
+	
+    int binsX = 10;
+    int binsY = 10;
+    int binsZ = 10;
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
@@ -252,8 +246,8 @@ int main(int argc, char** argv) {
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);
 
-		mat_ter->SetSpinningFriction(rollfr);
-		mat_ter->SetRollingFriction(rollfr);
+		mat_ter->SetSpinningFriction(rolling_friction);
+		mat_ter->SetRollingFriction(rolling_friction);
 
 		material_terrain = mat_ter;
 
@@ -272,8 +266,8 @@ int main(int argc, char** argv) {
 	// it's not the problem for using all iterations
 	//container->SetMaterialSurface(material_terrain);
 	container->GetMaterialSurface()->SetFriction(friction_terrain);
-	container->GetMaterialSurface()->SetRollingFriction(rollfr);
-	container->GetMaterialSurface()->SetSpinningFriction(rollfr);
+	container->GetMaterialSurface()->SetRollingFriction(rolling_friction);
+	container->GetMaterialSurface()->SetSpinningFriction(rolling_friction);
 	container->GetCollisionModel()->ClearModel();
 	
 	// Bottom box
@@ -281,7 +275,7 @@ int main(int argc, char** argv) {
 		ChQuaternion<>(1, 0, 0, 0), true);
 	container->GetCollisionModel()->BuildModel();
 	
-
+#ifdef USE_SINGLE_SPHERE
 	// Create a Sphere
 	auto ball = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(ball);			// FLAG
@@ -297,18 +291,16 @@ int main(int argc, char** argv) {
 	ball->GetCollisionModel()->ClearModel();
 
 	ball->GetMaterialSurface()->SetFriction(friction_terrain);
-	ball->GetMaterialSurface()->SetRollingFriction(rollfr);
-	ball->GetMaterialSurface()->SetSpinningFriction(rollfr);
-
+	ball->GetMaterialSurface()->SetRollingFriction(rolling_friction);
+	ball->GetMaterialSurface()->SetSpinningFriction(rolling_friction);
 	
-	// Bottom box
 	utils::AddSphereGeometry(ball.get(),radius_g, ChVector<>(0, 0, 0),
 		ChQuaternion<>(1, 0, 0, 0), true);
 	ball->GetCollisionModel()->BuildModel();
 
 	GetLog()<< "ball rolling : " <<ball->GetMaterialSurface()->GetRollingFriction()<<"\n";
 	//		
-	
+#else	
 	// Create the sampler
 	utils::Generator gen(system);
 	// SPHERES
@@ -316,9 +308,7 @@ int main(int argc, char** argv) {
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	//gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
-
-
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
 	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
 
 	std::vector<std::shared_ptr<ChBody>> particlelist;
@@ -334,7 +324,7 @@ int main(int argc, char** argv) {
 	int jiter = std::ceil(particlelist.size() / 2);
 	double rgen = particlelist[jiter].get()->GetMaterialSurface()->GetRollingFriction();
 	GetLog() << "gen rolling  : " << rgen << "\n";
-
+#endif // USE_SINGLE_SPHERE
 
 	
 #ifdef CHRONO_OPENGL
@@ -378,6 +368,10 @@ int main(int argc, char** argv) {
 
 		system->DoStepDynamics(time_step);
 		sim_frame++;
+
+#ifdef USE_SINGLE_SPHERE
+		avkinenergy = ComputeKineticEnergy(ball.get());
+#else
 		auto list = system->Get_bodylist();
 				for (auto body = list->begin(); body != list->end(); ++body) {
 		//for (auto body = particlelist.begin(); body != particlelist.end(); ++body) {
@@ -386,6 +380,7 @@ int main(int argc, char** argv) {
 		}
 //		avkinenergy /= particlelist.size();
 		avkinenergy /= list->size();
+#endif
 		mfun.AddPoint(system->GetChTime(), avkinenergy);
 
 		cum_sim_time += system->GetTimerStep();
