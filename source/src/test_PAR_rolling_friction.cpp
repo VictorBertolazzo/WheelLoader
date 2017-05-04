@@ -93,7 +93,7 @@ int main(int argc, char** argv) {
 
 
 	int num_threads = 4;
-	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DVI;//DEM
+	ChMaterialSurface::ContactMethod method = ChMaterialSurface::NSC;//SMC
 	bool use_mat_properties = true;
 	bool render = true;
 	bool track_granule = false;
@@ -175,17 +175,17 @@ int main(int argc, char** argv) {
 	chrono::ChSystemParallel* system;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-		ChSystemParallelDEM* sys = new ChSystemParallelDEM;
-		sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
-		sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
+	case ChMaterialSurface::SMC: {
+		ChSystemParallelSMC* sys = new ChSystemParallelSMC;
+		sys->GetSettings()->solver.contact_force_model = ChSystemSMC::Hertz;
+		sys->GetSettings()->solver.tangential_displ_mode = ChSystemSMC::TangentialDisplacementModel::OneStep;
 		sys->GetSettings()->solver.use_material_properties = use_mat_properties;
 		system = sys;
 
 		break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
+	case ChMaterialSurface::NSC: {
+		ChSystemParallelNSC* sys = new ChSystemParallelNSC;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;	
 		sys->GetSettings()->solver.max_iteration_normal = max_iteration_normal;
 		sys->GetSettings()->solver.max_iteration_sliding = max_iteration_sliding;
@@ -221,11 +221,11 @@ int main(int argc, char** argv) {
 	// ---------------------
 
 	// Create contact material for terrain
-	std::shared_ptr<ChMaterialSurfaceBase> material_terrain;
+	std::shared_ptr<ChMaterialSurface> material_terrain;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-		auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+	case ChMaterialSurface::SMC: {
+		auto mat_ter = std::make_shared<ChMaterialSurfaceSMC>();
 		mat_ter->SetFriction(friction_terrain);
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetYoungModulus(Y_terrain);
@@ -240,8 +240,8 @@ int main(int argc, char** argv) {
 
 		break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-		auto mat_ter = std::make_shared<ChMaterialSurface>();
+	case ChMaterialSurface::NSC: {
+		auto mat_ter = std::make_shared<ChMaterialSurfaceNSC>();
 		mat_ter->SetFriction(friction_terrain);
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);
@@ -264,11 +264,11 @@ int main(int argc, char** argv) {
 	container->SetBodyFixed(true);
 	container->SetCollide(true);
 	// it's not the problem for using all iterations
-	//container->SetMaterialSurface(material_terrain);
-	container->GetMaterialSurface()->SetFriction(friction_terrain);
+	container->SetMaterialSurface(material_terrain);
+	/*container->GetMaterialSurfaceBase()->SetFriction(friction_terrain);
 	container->GetMaterialSurface()->SetRollingFriction(rolling_friction);
 	container->GetMaterialSurface()->SetSpinningFriction(rolling_friction);
-	container->GetCollisionModel()->ClearModel();
+	*/container->GetCollisionModel()->ClearModel();
 	
 	// Bottom box
 	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, 10*radius_g), ChVector<>(0, 0, 0*radius_g),
@@ -322,7 +322,7 @@ int main(int argc, char** argv) {
 	particlelist.erase(particlelist.begin()); // delete terrain body from the list
 	//particlelist.erase(particlelist.begin()); // delete torus body from the list
 	int jiter = std::ceil(particlelist.size() / 2);
-	double rgen = particlelist[jiter].get()->GetMaterialSurface()->GetRollingFriction();
+	double rgen = particlelist[jiter].get()->GetMaterialSurfaceNSC()->GetRollingFriction();
 	GetLog() << "gen rolling  : " << rgen << "\n";
 #endif // USE_SINGLE_SPHERE
 

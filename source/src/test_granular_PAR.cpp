@@ -51,7 +51,7 @@ using std::cout;
 using std::endl;
 
 int num_threads = 40;
-ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;
+ChMaterialSurface::ContactMethod method = ChMaterialSurface::SMC;
 // PovRay Output
 bool povray_output = false;
 // Material
@@ -214,7 +214,7 @@ int SpawnParticles(utils::Generator* gen) {
 	return gen->getTotalNumBodies();
 }
 // Funnel Generation , case::FUNNEL, 7.2r m/s speed.
-void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
+void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurface> material_terrain){
 	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(funnel);
 	funnel->SetIdentifier(-2);
@@ -224,12 +224,12 @@ void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, s
 	funnel->SetMaterialSurface(material_terrain);
 	switch (method) {
 		// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
-	case ChMaterialSurfaceBase::DEM: {
-										 funnel->GetMaterialSurfaceDEM()->SetFriction(.1f);
+	case ChMaterialSurface::SMC: {
+										 funnel->GetMaterialSurfaceSMC()->SetFriction(.1f);
 										 break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-										 funnel->GetMaterialSurface()->SetFriction(.1f);
+	case ChMaterialSurface::NSC: {
+										 funnel->GetMaterialSurfaceNSC()->SetFriction(.1f);
 										 break;
 	}
 	}
@@ -262,7 +262,7 @@ void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, s
 
 }
 // Hollowed Cylinder Generation , case::CASCADE
-void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurfaceBase> material_terrain, double time_hold){	// Create TUBE body
+void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurface> material_terrain, double time_hold){	// Create TUBE body
 	auto tube = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(tube);
 	tube->SetIdentifier(-2);
@@ -341,17 +341,17 @@ int main(int argc, char** argv) {
 	chrono::ChSystemParallel* system;
 	// Create system and set method-specific solver settings
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-										 ChSystemParallelDEM* sys = new ChSystemParallelDEM;
-										 sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
-										 sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
+	case ChMaterialSurface::SMC: {
+										 ChSystemParallelSMC* sys = new ChSystemParallelSMC;
+										 sys->GetSettings()->solver.contact_force_model = ChSystemSMC::Hertz;
+										 sys->GetSettings()->solver.tangential_displ_mode = ChSystemSMC::TangentialDisplacementModel::OneStep;
 										 sys->GetSettings()->solver.use_material_properties = use_mat_properties;
 										 system = sys;
 
 										 break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-										 ChSystemParallelDVI* sys = new ChSystemParallelDVI;
+	case ChMaterialSurface::NSC: {
+										 ChSystemParallelNSC* sys = new ChSystemParallelNSC;
 										 sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;
 										 sys->GetSettings()->solver.max_iteration_normal = 0;
 										 sys->GetSettings()->solver.max_iteration_sliding = 0;
@@ -390,11 +390,11 @@ int main(int argc, char** argv) {
 	// -----------------------------------------------------------------------------------
 
 			// Create contact material for terrain
-			std::shared_ptr<ChMaterialSurfaceBase> material_terrain;
+			std::shared_ptr<ChMaterialSurface> material_terrain;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-										 auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+	case ChMaterialSurface::SMC: {
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceSMC>();
 										 mat_ter->SetFriction(friction_terrain);
 										 mat_ter->SetRestitution(restitution_terrain);
 										 mat_ter->SetYoungModulus(Y_terrain);
@@ -409,8 +409,8 @@ int main(int argc, char** argv) {
 
 										 break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-										 auto mat_ter = std::make_shared<ChMaterialSurface>();
+	case ChMaterialSurface::NSC: {
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceNSC>();
 										 mat_ter->SetFriction(friction_terrain);
 										 mat_ter->SetRestitution(restitution_terrain);
 										 mat_ter->SetCohesion(0.0);
@@ -427,11 +427,11 @@ int main(int argc, char** argv) {
 	// -----------------------------------------------------------------------------------
 
 	// Create contact material for container, tube, funnel...
-	std::shared_ptr<ChMaterialSurfaceBase> material_body;
+	std::shared_ptr<ChMaterialSurface> material_body;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-										 auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+	case ChMaterialSurface::SMC: {
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceSMC>();
 										 mat_ter->SetFriction(friction_terrain);
 										 mat_ter->SetRestitution(restitution_terrain);
 										 mat_ter->SetYoungModulus(Y_terrain);
@@ -446,8 +446,8 @@ int main(int argc, char** argv) {
 
 										 break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-										 auto mat_ter = std::make_shared<ChMaterialSurface>();
+	case ChMaterialSurface::NSC: {
+										 auto mat_ter = std::make_shared<ChMaterialSurfaceNSC>();
 										 mat_ter->SetFriction(friction_terrain);
 										 mat_ter->SetRestitution(restitution_terrain);
 										 mat_ter->SetCohesion(0.0);
@@ -533,7 +533,7 @@ int main(int argc, char** argv) {
 								  hdims.y() -= 2 * r;
 								  // move the center abscissa by a 1*r 
 								  center.x() += r * pow(-1, il);
-								  if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
+								  if (method == ChMaterialSurface::NSC){ time_step = 1e-3; }
 
 
 	}
@@ -548,7 +548,7 @@ int main(int argc, char** argv) {
 								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);
 
 								   time_to_plot = 1.75;
-								   if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
+								   if (method == ChMaterialSurface::NSC){ time_step = 1e-3; }
 
 								  break;
 		}
@@ -562,7 +562,7 @@ int main(int argc, char** argv) {
 								 std::cout << "Generated particles:  " << num_particles << std::endl;
 								 time_end = 10.00;
 								 time_to_plot = 6.5;
-								 if (method == ChMaterialSurfaceBase::DVI){ time_step = 1e-3; }
+								 if (method == ChMaterialSurface::NSC){ time_step = 1e-3; }
 								  break;
 		}
 		case TestType::CASCADE: {	double time_hold = 2.0;

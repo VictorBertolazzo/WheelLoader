@@ -702,7 +702,7 @@ public:
 	WheelLoader_Vehicle(
 		const bool fixed,
 		chrono::vehicle::SuspensionType suspType,
-		chrono::ChMaterialSurfaceBase::ContactMethod contactMethod = chrono::ChMaterialSurfaceBase::DVI)
+		chrono::ChMaterialSurface::ContactMethod contactMethod = chrono::ChMaterialSurface::NSC)
 		:ChWheeledVehicle(contactMethod), m_suspType(suspType){
 
 		// Create the chassis subsystem

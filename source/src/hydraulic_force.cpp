@@ -175,13 +175,13 @@ int main(int argc, char** argv) {
 	chrono::ChSystemParallel* system;
 
 #ifdef USE_PENALTY
-	ChSystemParallelDEM* sys = new ChSystemParallelDEM;
+	ChSystemParallelSMC* sys = new ChSystemParallelSMC;
 	sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
 	sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
 	sys->GetSettings()->solver.use_material_properties = use_mat_properties;
 	system = sys;
 #else
-	ChSystemParallelDVI* sys = new ChSystemParallelDVI;
+	ChSystemParallelNSC* sys = new ChSystemParallelNSC;
 	sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 	sys->GetSettings()->solver.max_iteration_normal = 0;
 	sys->GetSettings()->solver.max_iteration_sliding = 200;

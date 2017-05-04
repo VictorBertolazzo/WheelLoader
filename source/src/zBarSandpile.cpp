@@ -66,7 +66,7 @@ double ta1 = 2.00; double ta2 = 11.00;double ta3 = 15.00;double ta4= 5.00;double
 		// chassis : FWD motion til ta1, stop until ta2, then RWD til ta3;
 
 int num_threads = 40;
-	ChMaterialSurfaceBase::ContactMethod method = ChMaterialSurfaceBase::DEM;//DEM
+	ChMaterialSurface::ContactMethod method = ChMaterialSurface::SMC;//NSC
 	bool use_mat_properties = true;
 	bool render = false;
 	bool track_granule = false;
@@ -266,11 +266,11 @@ void AddCapsHulls(std::vector<Points> p_int, BucketSide side, std::shared_ptr<Ch
 	ReadFile(ext_profile, p_ext);
 	ReadFile(int_profile, p_int);
 	// Create a material (will be used by both objects)
-	auto materialDVI = std::make_shared<ChMaterialSurface>();
+	auto materialDVI = std::make_shared<ChMaterialSurfaceNSC>();
 	materialDVI->SetRestitution(0.1f);
 	materialDVI->SetFriction(0.4f);
 	// Create a material (will be used by both objects)
-	auto materialDEM = std::make_shared<ChMaterialSurfaceDEM>();
+	auto materialDEM = std::make_shared<ChMaterialSurfaceSMC>();
 	materialDEM->SetYoungModulus(1.0e7f);
 	materialDEM->SetRestitution(0.1f);
 	materialDEM->SetFriction(0.4f);
@@ -654,11 +654,11 @@ void CreateMechanism(ChSystem& system, std::shared_ptr<ChBody> ground){
 	ReadFile(ext_profile, p_ext);
 	ReadFile(int_profile, p_int);
 	// Create a material (will be used by both objects)
-	auto materialDVI = std::make_shared<ChMaterialSurface>();
+	auto materialDVI = std::make_shared<ChMaterialSurfaceNSC>();
 	materialDVI->SetRestitution(0.1f);
 	materialDVI->SetFriction(0.4f);
 	// Create a material (will be used by both objects)
-	auto materialDEM = std::make_shared<ChMaterialSurfaceDEM>();
+	auto materialDEM = std::make_shared<ChMaterialSurfaceSMC>();
 	materialDEM->SetYoungModulus(1.0e7f);
 	materialDEM->SetRestitution(0.1f);
 	materialDEM->SetFriction(0.4f);
@@ -979,7 +979,7 @@ void CreateMechanism(ChSystem& system, std::shared_ptr<ChBody> ground){
 	
 }
 // Create Particles function
-utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
+utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSurface> material_terrain){
 	// Aliquotes
 	double quote_sp = 0.35;//1//.00
 	double quote_bs = 0.10;//2
@@ -1046,7 +1046,7 @@ utils::Generator CreateParticles(ChSystem* system, std::shared_ptr<ChMaterialSur
 return gen;
 }
 // Create Terrain function
-std::shared_ptr<ChBody> CreateTerrain(ChSystem* system, std::shared_ptr<ChMaterialSurfaceBase> material_terrain){
+std::shared_ptr<ChBody> CreateTerrain(ChSystem* system, std::shared_ptr<ChMaterialSurface> material_terrain){
 	// Create container body
 	auto container = std::shared_ptr<ChBody>(system->NewBody());
 	system->AddBody(container);
@@ -1111,17 +1111,17 @@ int main(int argc, char** argv) {
 	chrono::ChSystemParallel* system;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-		ChSystemParallelDEM* sys = new ChSystemParallelDEM;
-		sys->GetSettings()->solver.contact_force_model = ChSystemDEM::Hertz;
-		sys->GetSettings()->solver.tangential_displ_mode = ChSystemDEM::TangentialDisplacementModel::OneStep;
+	case ChMaterialSurface::SMC: {
+		ChSystemParallelSMC* sys = new ChSystemParallelSMC;
+		sys->GetSettings()->solver.contact_force_model = ChSystemSMC::Hertz;
+		sys->GetSettings()->solver.tangential_displ_mode = ChSystemSMC::TangentialDisplacementModel::OneStep;
 		sys->GetSettings()->solver.use_material_properties = use_mat_properties;
 		system = sys;
 
 		break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-		ChSystemParallelDVI* sys = new ChSystemParallelDVI;
+	case ChMaterialSurface::NSC: {
+		ChSystemParallelNSC* sys = new ChSystemParallelNSC;
 		sys->GetSettings()->solver.solver_mode = SolverMode::SLIDING;
 		sys->GetSettings()->solver.max_iteration_normal = 0;
 		sys->GetSettings()->solver.max_iteration_sliding = 200;
@@ -1158,11 +1158,11 @@ int main(int argc, char** argv) {
 	// ---------------------
 
 	// Create contact material for terrain
-	std::shared_ptr<ChMaterialSurfaceBase> material_terrain;
+	std::shared_ptr<ChMaterialSurface> material_terrain;
 
 	switch (method) {
-	case ChMaterialSurfaceBase::DEM: {
-		auto mat_ter = std::make_shared<ChMaterialSurfaceDEM>();
+	case ChMaterialSurface::SMC: {
+		auto mat_ter = std::make_shared<ChMaterialSurfaceSMC>();
 		mat_ter->SetFriction(friction_terrain);
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetYoungModulus(Y_terrain);
@@ -1177,8 +1177,8 @@ int main(int argc, char** argv) {
 
 		break;
 	}
-	case ChMaterialSurfaceBase::DVI: {
-		auto mat_ter = std::make_shared<ChMaterialSurface>();
+	case ChMaterialSurface::NSC: {
+		auto mat_ter = std::make_shared<ChMaterialSurfaceNSC>();
 		mat_ter->SetFriction(friction_terrain);
 		mat_ter->SetRestitution(restitution_terrain);
 		mat_ter->SetCohesion(coh_force_terrain);

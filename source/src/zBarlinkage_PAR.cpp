@@ -127,11 +127,11 @@ int main(int argc, char* argv[]) {
 	ReadFile(ext_profile, p_ext);
 	ReadFile(int_profile, p_int);
 	// Create a material (will be used by both objects)
-	auto material = std::make_shared<ChMaterialSurface>();
+	auto material = std::make_shared<ChMaterialSurfaceNSC>();
 	material->SetRestitution(0.1f);
 	material->SetFriction(0.4f);
 	// Create a material (will be used by both objects)
-	auto materialDEM = std::make_shared<ChMaterialSurfaceDEM>();
+	auto materialDEM = std::make_shared<ChMaterialSurfaceSMC>();
 	materialDEM->SetYoungModulus(1.0e7f);
 	materialDEM->SetRestitution(0.1f);
 	materialDEM->SetFriction(0.4f);
@@ -141,10 +141,10 @@ int main(int argc, char* argv[]) {
 	// 1. Create the system
 #ifdef USE_PENALTY
 	//ChSystemParallelDEM* system = new ChSystemParallelDEM;
-	ChSystemParallelDEM system;
+	ChSystemParallelSMC system;
 	//ChMaterialSurfaceBase::ContactMethod contact_method = ChMaterialSurfaceBase::DEM;
    #else
-	ChSystemParallelDVI system;
+	ChSystemParallelNSC system;
 #endif
 
 	system.Set_G_acc(ChVector<>(.0,.0,.0));

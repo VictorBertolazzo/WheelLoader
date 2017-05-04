@@ -17,16 +17,16 @@
 #include "chrono_irrlicht/ChIrrApp.h"
 #include "chrono/utils/ChUtilsGenerators.h"
 
-
+#include "chrono/physics/ChSystemNSC.h"
 
 #include "chrono_opengl/ChOpenGLWindow.h"
 
-#include "chrono/physics/ChContactContainerDVI.h"
+#include "chrono/physics/ChContactContainerNSC.h"
 #include "chrono/solver/ChSolverSOR.h"
 
-#include "chrono/physics/ChSystemDEM.h"
-#include "chrono/physics/ChContactContainerDEM.h"
-#include "chrono/solver/ChSolverDEM.h"
+#include "chrono/physics/ChSystemSMC.h"
+#include "chrono/physics/ChContactContainerSMC.h"
+#include "chrono/solver/ChSolverSMC.h"
 
 
 
@@ -273,11 +273,11 @@ int main(int argc, char* argv[]) {
 	
 	
 	 // Create a material (will be used by both objects)
-	auto material = std::make_shared<ChMaterialSurface>();
+	auto material = std::make_shared<ChMaterialSurfaceNSC>();
 	material->SetRestitution(0.1f);
 	material->SetFriction(0.4f);
 	// Create a material (will be used by both objects)
-	auto materialDEM = std::make_shared<ChMaterialSurfaceDEM>();
+	auto materialDEM = std::make_shared<ChMaterialSurfaceSMC>();
 	materialDEM->SetYoungModulus(1.0e7f);
 	materialDEM->SetRestitution(0.1f);
 	materialDEM->SetFriction(0.4f);
@@ -287,9 +287,9 @@ int main(int argc, char* argv[]) {
 	
 	// parameters for tests
 #ifdef USE_PENALTY
-	ChSystemDEM system;
+	ChSystemSMC system;
 #else
-	ChSystem system;
+	ChSystemNSC system;
 #endif
 
 	system.Set_G_acc(ChVector<>(0., +10.0, 0.));

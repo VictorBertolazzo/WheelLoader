@@ -1,7 +1,10 @@
 
 #include <iostream>//Add 
 
+#include "chrono/physics/ChSystemNSC.h"
+
 #include "chrono/assets/ChTriangleMeshShape.h"
+
 
 #include "chrono/core/ChRealtimeStep.h"
 #include "chrono/physics/ChSystem.h"
@@ -129,7 +132,7 @@ int main(int argc, char* argv[]) {
 	// 0. Set the path to the Chrono data folder
 	SetChronoDataPath(CHRONO_DATA_DIR);
 	// 1. Create the system
-    ChSystem system;
+    ChSystemNSC system;
 	system.Set_G_acc(ChVector<>(.0,.0,.0));
     /// .16 initial from chassis offset, .21 initial max height, .33 initial width 
 	// measures are in [m]

@@ -18,12 +18,12 @@
 
 #include "chrono_opengl/ChOpenGLWindow.h"
 
-#include "chrono/physics/ChContactContainerDVI.h"
+#include "chrono/physics/ChContactContainerNSC.h"
 #include "chrono/solver/ChSolverSOR.h"
 
-#include "chrono/physics/ChSystemDEM.h"
-#include "chrono/physics/ChContactContainerDEM.h"
-#include "chrono/solver/ChSolverDEM.h"
+#include "chrono/physics/ChSystemSMC.h"
+#include "chrono/physics/ChContactContainerSMC.h"
+#include "chrono/solver/ChSolverSMC.h"
 using namespace chrono;
 using namespace chrono::collision;
 
@@ -262,28 +262,28 @@ int main(int argc, char* argv[]) {
 	
 	
 	 // Create a material (will be used by both objects)
-	auto material = std::make_shared<ChMaterialSurface>();
-	material->SetRestitution(0.1f);
-	material->SetFriction(0.4f);
+	auto materialNSC = std::make_shared<ChMaterialSurfaceNSC>();
+	materialNSC->SetRestitution(0.1f);
+	materialNSC->SetFriction(0.4f);
 	// Create a material (will be used by both objects)
-	auto materialDEM = std::make_shared<ChMaterialSurfaceDEM>();
-	materialDEM->SetYoungModulus(1.0e7f);
-	materialDEM->SetRestitution(0.1f);
-	materialDEM->SetFriction(0.4f);
-	materialDEM->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
+	auto materialSMC = std::make_shared<ChMaterialSurfaceSMC>();
+	materialSMC->SetYoungModulus(1.0e7f);
+	materialSMC->SetRestitution(0.1f);
+	materialSMC->SetFriction(0.4f);
+	materialSMC->SetAdhesion(0);  // Magnitude of the adhesion in Constant adhesion model
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	// parameters for tests
 #ifdef USE_PENALTY
-	ChSystemParallelDEM system;
+	ChSystemParallelSMC system;
 #else
-	ChSystemParallelDVI system;
+	ChSystemParallelNSC system;
 #endif
 
 	system.Set_G_acc(ChVector<>(0., -10.0, 0.));
 	ChVector<> pos_ball(.5, +2.0, .1);
-	auto material_test = material;
+	auto material_test = materialNSC;
 	double time_step = .0001;
 	double radius = .15;
 
@@ -294,9 +294,9 @@ int main(int argc, char* argv[]) {
 		ball->SetPos(pos_ball);
 		ball->SetBodyFixed(false);
 #ifdef USE_PENALTY
-		ball->SetMaterialSurface(materialDEM);
+		ball->SetMaterialSurface(materialSMC);
 #else
-		ball->SetMaterialSurface(material_test);
+		ball->SetMaterialSurface(materialNSC);
 #endif
 		ball->SetCollide(true);
 
@@ -334,12 +334,12 @@ int main(int argc, char* argv[]) {
 		AddCapsHulls(p_int, BucketSide::LEFT, bucket);
 		AddCapsHulls(p_int, BucketSide::RIGHT, bucket);
 #ifdef USE_PENALTY
-		bucket->SetMaterialSurface(materialDEM);
+		bucket->SetMaterialSurface(materialSMC);
 #else
 		bucket->SetMaterialSurface(material_test);
 #endif
 		bucket->GetCollisionModel()->BuildModel();
-		//bucket->SetMaterialSurface(materialDEM);
+		//bucket->SetMaterialSurface(materialSMC);
 		geometry::ChTriangleMeshConnected bucket_mesh;
 		bucket_mesh.LoadWavefrontMesh(out_dir + "data/bucket_mod.obj", false, false);
 		auto bucket_mesh_shape = std::make_shared<ChTriangleMeshShape>();
