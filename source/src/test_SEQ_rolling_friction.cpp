@@ -47,7 +47,7 @@ using namespace irr::gui;
 
 
 // --------------------------------------------------------------------------
-#define USE_SINGLE_SPHERE
+//#define USE_SINGLE_SPHERE
 
 void TimingOutput(chrono::ChSystem* mSys) {
 	double TIME = mSys->GetChTime();
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rolling_friction = 0.1 * radius_g;
+	double rolling_friction = 0.05 * radius_g;//RAISING mi_r=.5*r, BALLS TREPASS FLOOR.WHY?? 
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -220,7 +220,6 @@ int main(int argc, char** argv) {
 	//system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ); 
 
 
-
 	// Create contact material for terrain
 	std::shared_ptr<ChMaterialSurface> material_terrain;
 
@@ -266,6 +265,7 @@ int main(int argc, char** argv) {
 	container->SetCollide(true);
 	// it's not the problem for using all iterations
 	container->SetMaterialSurface(material_terrain);
+	
 	/*container->GetMaterialSurface()->SetFriction(friction_terrain);
 	container->GetMaterialSurface()->SetRollingFriction(rolling_friction);
 	container->GetMaterialSurface()->SetSpinningFriction(rolling_friction);
@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.9 * 1.01 *radius_g, ChVector<>(.0, .0, 10 * radius_g), 0.030, 9 * radius_g);
 	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
 
 	std::vector<std::shared_ptr<ChBody>> particlelist;
@@ -324,13 +324,15 @@ int main(int argc, char** argv) {
 	//particlelist.erase(particlelist.begin()); // delete torus body from the list
 	int jiter = std::ceil(particlelist.size() / 2);
 	double rgen = particlelist[jiter].get()->GetMaterialSurfaceNSC()->GetRollingFriction();
-	GetLog() << "gen rolling  : " << rgen << "\n";
+	GetLog() << "Generated particles rolling friction  : " << rgen << "\n";
+	double rcon = container->GetMaterialSurfaceNSC()->GetRollingFriction();
+	GetLog() << "Container rolling friction  : " << rcon << "\n";
+
 #endif // USE_SINGLE_SPHERE
 
 	
 #ifdef CHRONO_IRRLICHT
-	// Create the Irrlicht visualization (open the Irrlicht device,
-	// bind a simple user interface, etc. etc.)
+	// Create the Irrlicht visualization (open the Irrlicht device,bind a simple user interface, etc. etc.)
 	ChIrrApp application(system, L"Contacts with rolling friction", core::dimension2d<u32>(800, 600), false,
 		true);
 
@@ -338,7 +340,9 @@ int main(int argc, char** argv) {
 	ChIrrWizard::add_typical_Logo(application.GetDevice());
 	ChIrrWizard::add_typical_Sky(application.GetDevice());
 	ChIrrWizard::add_typical_Lights(application.GetDevice());
-	ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(-.06, -.11, +.1));
+	application.AddTypicalCamera(core::vector3df(.5, 0, 0), core::vector3df(0, 0, 0)); //'camera' location            // "look at" location
+	
+	//ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(0., +1.,.5));
 
 	// Use this function for adding a ChIrrNodeAsset to all already created items.
 	// Otherwise use application.AssetBind(myitem); on a per-item basis.

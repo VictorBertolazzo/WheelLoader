@@ -1,10 +1,13 @@
 // Vehicle Test
 // Victor Bertolazzo
+	//  Discriminate parallel or serial simulation.
 //    #define USE_PARALLEL
 	#define USE_SEQUENTIAL
-	//#define USE_PENALTY
-    //#define TEST_ENABLE
-	//#define USE_SEP_VEH
+	// Use SMC/NSC contact method.
+//#define USE_PENALTY
+	// Additional features
+//#define TEST_ENABLE 
+//#define USE_SEP_VEH
 #include <cmath>
 #include <iostream>
 #include <sstream>
@@ -269,7 +272,7 @@ public:
 		const ChVector<>& location,
 		std::shared_ptr<ChBody> tierod_body,
 		double left_ang_vel,
-		double right_ang_vel) override{
+		double right_ang_vel) {
 
 		// Unit vectors for orientation matrices.
 		ChVector<> u;ChVector<> v;ChVector<> w;ChMatrix33<> rot;
@@ -623,20 +626,16 @@ private:
 
 };
 
-// Concrete class defining the WL steering mechanism
-class PivotWL : public ChSteering{
+// Concrete class defining the WL steering mechanism--disconnected from ChSteering
+class PivotWL {
 	public:
-		PivotWL(const std::string& name) : ChSteering(name) {}
+		PivotWL(const std::string& name)  { }
 		~PivotWL() {}
 		
-		const double m_maxAngle = 40 * CH_C_DEG_TO_RAD; //40° rotation;
+		const double PivotWL::m_maxAngle = 40 * CH_C_DEG_TO_RAD; //40° rotation;
 		const double PivotWL::m_mass = 10; //total mass;
-		
-		void PivotWL::Initialize(std::shared_ptr<ChBodyAuxRef> chassis,
-			const ChVector<>& location,
-			const ChQuaternion<>& rotation) override
-		{}
-// funciton overload: it realizes a rotational engine link between chassis(front_body) and rear_body
+	const std::string& PivotWL::m_name = "Steering";// class name
+// Steering function: it realizes a rotational engine link between chassis(front_body) and rear_body
 		void PivotWL::Initialize(std::shared_ptr<ChBodyAuxRef> chassis,
 			std::shared_ptr<ChBodyAuxRef> rear_body,
 			const ChVector<>& location,
@@ -659,16 +658,17 @@ class PivotWL : public ChSteering{
 
 		}
 
-		void PivotWL::Synchronize(double time, double steering) override {
+		void PivotWL::Synchronize(double time, double steering)  {
 			double angle = steering * GetMaxAngle();
 			if (auto fun = std::dynamic_pointer_cast<ChFunction_Const>(m_pivoting->Get_rot_funct()))
 				fun->Set_yconst(angle);
 
 		}
 		double PivotWL::GetMaxAngle() const { return m_maxAngle; }
-		void PivotWL::AddVisualizationAssets(chrono::vehicle::VisualizationType vis) override {
+		void PivotWL::AddVisualizationAssets(chrono::vehicle::VisualizationType vis)  {
 			if (vis == chrono::vehicle::VisualizationType::NONE)
 				return;
+			// Add a z-oriented cylinder vis shape.
 		}
 		void PivotWL::LogConstraintViolations() {
 			// Engine joint
@@ -684,17 +684,18 @@ class PivotWL : public ChSteering{
 
 		}
 		void PivotWL::RemoveVisualizationAssets(){
-
+			// Delete vis shape.
 		}
 		std::shared_ptr<ChBody> GetSteeringLink() const { return std::shared_ptr<ChBody>(); }
 		double PivotWL::GetMass() const { return m_mass; }
 
 protected:
 	std::shared_ptr<ChLinkEngine> m_pivoting;
+	std::string m_name;
 };
 
-#define USE_RACKPIN		// Flag to test RigidAxle suspension with a classical steering mechanism
-#define USE_STEERLIST	// Flag to decide whether to use ChSteeringList or not()
+//#define USE_RACKPIN		// Flag to test RigidAxle suspension with a classical steering mechanism
+//#define USE_STEERLIST	// Flag to decide whether to use ChSteeringList or not()
 
 // Concrete class for WheelLoader vehicle
 class WheelLoader_Vehicle : public chrono::vehicle::ChWheeledVehicle {
@@ -709,28 +710,22 @@ public:
 		m_chassis = std::make_shared<Generic_Chassis>("Chassis");
 
 #ifdef USE_RACKPIN
-	#ifdef USE_STEERLIST
 		m_steerings.resize(1);
 		m_steerings[0] = std::make_shared<Generic_RackPinion>("Steering");
-	#else
-		m_steerings = std::make_shared<Generic_RackPinion>("Steering");
-
-	#endif
-
 #else
 		// Create the rear body subsystem
-		m_rear = std::make_shared<ChBodyAuxRef>();
-		m_rear->SetName("RearBody");
+		m_rear = std::shared_ptr<ChBodyAuxRef>(m_system->NewBodyAuxRef());
+		m_rear->SetName("rear body");
 		// Create the steering subsystem
-		//m_steerings.resize(1);//Unable to deal with ChSteeringList
-		m_steerings = std::make_shared<PivotWL>("Steering");
+		m_steerings.resize(0);//Unable to deal with ChSteeringList
+		m_steer = std::make_shared<PivotWL>("Steering");
 
 #endif
 		
 		// Create the suspension subsystems--RigidAxle
 		m_suspensions.resize(2);
-			m_suspensions[0] = std::make_shared<Generic_DoubleWishboneFront>("FrontSusp");
-			m_suspensions[1] = std::make_shared<Generic_DoubleWishboneRear>("RearSusp");
+			m_suspensions[0] = std::make_shared<RigidAxle>("FrontSusp");
+			m_suspensions[1] = std::make_shared<RigidAxle>("RearSusp");
 		
 
 		// Create the wheels
@@ -768,22 +763,16 @@ public:
 #ifdef USE_RACKPIN
 		ChVector<> offset(1.60, 0, -0.07);
 
-		#ifdef USE_STEERLIST
 		m_steerings[0]->Initialize(m_chassis->GetBody(), offset, ChQuaternion<>(1, 0, 0, 0));
 		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings[0]->GetSteeringLink());
-		#else
-		m_steerings->Initialize(m_chassis->GetBody(), offset, ChQuaternion<>(1, 0, 0, 0));
-		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_steerings->GetSteeringLink());
-		#endif // USE_STEERLIST
-
 		m_suspensions[1]->Initialize(m_chassis->GetBody(), ChVector<>(-1.6914, 0, 0), m_chassis->GetBody());
 
 #else
 		//check the transform
-		m_rear->SetCoord(chassisPos >> ChCoordsys<>(ChVector<>(-1.0,0.,0.),QUNIT));// Random pos for the rear body
+		m_rear->SetFrame_REF_to_abs(ChFrame<>(chassisPos) * ChFrame<>(ChVector<>(-1.5,0.,0.),QUNIT));// Random pos for the rear body
 		m_rear->SetMass(m_chassis->GetMass()); m_rear->SetInertia(m_chassis->GetInertia());
 		m_system->Add(m_rear);
-		m_steerings->Initialize(m_chassis->GetBody(), m_rear, ChVector<>(-.4, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
+		m_steer->Initialize(m_chassis->GetBody(), m_rear, ChVector<>(-.4, 0, -.0), ChQuaternion<>(1, 0, 0, 0));
 		m_suspensions[0]->Initialize(m_chassis->GetBody(), ChVector<>(1.6914, 0, 0), m_chassis->GetBody());
 		m_suspensions[1]->Initialize(m_rear, ChVector<>(-1.6914, 0, 0), m_rear);
 		
@@ -807,22 +796,36 @@ public:
 		m_brakes[3]->Initialize(m_suspensions[1]->GetRevolute(RIGHT));
 	}
 
+	void Synchronize(double time,
+		double steering,
+		double braking,
+		double powertrain_torque,
+		const TireForces& tire_forces) override{
+		
+		ChWheeledVehicle::Synchronize(time, steering, braking, powertrain_torque, tire_forces);
+#ifdef USE_RACKPIN
+
+#else
+		m_steer->Synchronize(time, steering);
+#endif //USE_RACKPIN
+
+	}
+
+
 	// Log debugging information
 	void LogHardpointLocations();  /// suspension hardpoints at design
 	void DebugLog(int what);       /// shock forces and lengths, constraints, etc.
+
+	// Synchronize method override (first call Synchronize base class method, then add whatever you want)
+
 
 private:
 	chrono::vehicle::SuspensionType m_suspType;
 	std::shared_ptr<ChBodyAuxRef> m_rear;
 	//enum SuspensionType { RIGID_AXLE };
 #ifdef USE_RACKPIN
-	#ifdef USE_STEERLIST
-
-	#else
-	std::shared_ptr<Generic_RackPinion> m_steerings;
-	#endif
 #else
-	std::shared_ptr<PivotWL> m_steerings;
+	std::shared_ptr<PivotWL> m_steer;
 
 #endif //USE_RACKPIN
 
@@ -994,7 +997,7 @@ int main(int argc, char* argv[]) {
 	vehicle.Initialize(ChCoordsys<>(initLoc + ChVector<>(0, 0, .0), initRot));
 	vehicle.SetChassisVisualizationType(VisualizationType::PRIMITIVES);
 	vehicle.SetSuspensionVisualizationType(VisualizationType::PRIMITIVES);
-	vehicle.SetSteeringVisualizationType(VisualizationType::NONE);
+	vehicle.SetSteeringVisualizationType(VisualizationType::MESH);
 	vehicle.SetWheelVisualizationType(VisualizationType::PRIMITIVES);
 
 	// Create the terrain
@@ -1147,6 +1150,7 @@ int main(int argc, char* argv[]) {
 		powertrain.Synchronize(time, throttle_input, driveshaft_speed);
 
 		vehicle.Synchronize(time, steering_input, braking_input, powertrain_torque, tire_forces);
+		// steering input synchronize??? 
 
 		app.Synchronize(driver.GetInputModeAsString(), steering_input, throttle_input, braking_input);
 

@@ -4,7 +4,9 @@ SET(MODELS
 #  central_pivot_mech
 #  demo_IRR_fel
 #  demo_PAR_friction
-  demo_VEH_wheelloader
+  demo_VEH_ArticulatedVehicle
+  demo_PAR_WheelLoader
+#  demo_VEH_wheelloader
   hydraulic_force
   iArmlinkage
   test_granular_PAR
@@ -21,6 +23,17 @@ SET(MODELS
   zBarlinkage_PAR
   zBarSandpile
   )
+
+  SET(MODEL_FILES
+    subsystems/Articulated_Front.h
+    subsystems/Articulated_Front.cpp
+    subsystems/Articulated_Rear.h
+    subsystems/Articulated_Rear.cpp
+)
+
+
+SOURCE_GROUP("subsystems" FILES ${MODEL_FILES})
+SOURCE_GROUP("" FILES ${MODELS}.cpp ${MODEL_FILES})
 
 #--------------------------------------------------------------
 # Find the Chrono package with required components
@@ -65,7 +78,7 @@ foreach(PROGRAM ${MODELS})
 
   message(STATUS "...add ${PROGRAM}")
 
-  add_executable(${PROGRAM}  "${PROGRAM}.cpp")
+  add_executable(${PROGRAM}  "${PROGRAM}.cpp" ${MODEL_FILES})
   source_group(""  FILES "${PROGRAM}.cpp")
 
   set_target_properties(${PROGRAM} PROPERTIES
