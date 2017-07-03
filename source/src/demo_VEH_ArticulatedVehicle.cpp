@@ -60,7 +60,7 @@ ChVector<> initLoc(0, 0, 0.5);
 ChQuaternion<> initRot = Q_from_AngZ(0 *CH_C_PI / 10);
 
 // Type of tire model (RIGID or FIALA)
-TireModelType tire_model = TireModelType::RIGID;
+TireModelType tire_model = TireModelType::FIALA;
 
 // Rigid terrain dimensions
 double terrainHeight = 0;
@@ -73,7 +73,7 @@ double terrainWidth = 100.0;   // size in Y direction
 enum TerrainType { RIGID_TERRAIN, GRANULAR_TERRAIN };
 
 // Type of terrain
-TerrainType terrain_type = GRANULAR_TERRAIN;
+TerrainType terrain_type = RIGID_TERRAIN;
 
 // Control visibility of containing bin walls
 bool visible_walls = true;

@@ -29,6 +29,8 @@
 
 #include "chrono_postprocess/ChGnuPlot.h"
 
+#include "utilities/UtilityFunctions.h"
+
 #ifdef CHRONO_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
@@ -41,35 +43,7 @@ using namespace postprocess;
 // --------------------------------------------------------------------------
 //#define USE_SINGLE_SPHERE
 
-void TimingOutput(chrono::ChSystem* mSys) {
-	double TIME = mSys->GetChTime();
-	double STEP = mSys->GetTimerStep();
-	double BROD = mSys->GetTimerCollisionBroad();
-	double NARR = mSys->GetTimerCollisionNarrow();
-	double SOLVER = mSys->GetTimerSolver();
-	double UPDT = mSys->GetTimerUpdate();
-	int REQ_ITS = 0;
-	int BODS = mSys->GetNbodies();
-	int CNTC = mSys->GetNcontacts();
-	if (chrono::ChSystemParallel* parallel_sys = dynamic_cast<chrono::ChSystemParallel*>(mSys)) {
-		REQ_ITS = std::static_pointer_cast<chrono::ChIterativeSolverParallel>(mSys->GetSolver())->GetTotalIterations();
-	}
 
-	printf("   %8.5f | %7.4f | %7.4f | %7.4f | %7.4f | %7.4f | %7d | %7d | %7d | %7.4f |\n", TIME, STEP, BROD, NARR,
-		SOLVER, UPDT, BODS, CNTC, REQ_ITS);
-}
-
-double ComputeKineticEnergy(ChBody* body){
-	
-	double mass = body->GetMass();
-	ChMatrix33<> I = body->GetInertia();
-	ChVector <> xdot = body->GetPos_dt();
-	ChVector <> omega = body->GetWvel_par();
-	
-	double kin = mass* xdot.Dot(xdot) + omega.Dot(I.Matr_x_Vect(omega)) ;
-	kin = kin / 2;	return kin;
-
-}
 // PovRay Output
 bool povray_output = false;
 const std::string out_dir = "../";
@@ -82,13 +56,13 @@ using std::endl;
 // --------------------------------------------------------------------------
 
 int main(int argc, char** argv) {
-	double time_step = 1e-3;
-	double time_end = 3.00;
+	double time_step = .5e-3;
+	double time_end = 1.00;
 
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
 	uint max_iteration_spinning = 100;
-	uint max_iteration_bilateral = 0;
+	uint max_iteration_bilateral = 100;
 
 
 
@@ -104,7 +78,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rolling_friction = 0.1 * radius_g;
+	double rolling_friction = 0.5 * radius_g;
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -308,7 +282,7 @@ int main(int argc, char** argv) {
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * 1.01 *radius_g, ChVector<>(.0, .0, 3 * radius_g), 0.030, 3 * radius_g);
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.1 * 1.01 *radius_g, ChVector<>(.0, .0, 10 * radius_g), 0.030, 9 * radius_g);
 	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
 
 	std::vector<std::shared_ptr<ChBody>> particlelist;
@@ -325,6 +299,7 @@ int main(int argc, char** argv) {
 	double rgen = particlelist[jiter].get()->GetMaterialSurfaceNSC()->GetRollingFriction();
 	GetLog() << "gen rolling  : " << rgen << "\n";
 #endif // USE_SINGLE_SPHERE
+	GetLog() << "Created Particles : " << particlelist.size() << "\n";
 
 	
 #ifdef CHRONO_OPENGL
@@ -382,6 +357,7 @@ int main(int argc, char** argv) {
 		avkinenergy /= list->size();
 #endif
 		mfun.AddPoint(system->GetChTime(), avkinenergy);
+		avkinenergy = .0;
 
 		cum_sim_time += system->GetTimerStep();
 		cum_broad_time += system->GetTimerCollisionBroad();

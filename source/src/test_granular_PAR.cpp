@@ -28,12 +28,15 @@
 
 
 
+
 #ifdef CHRONO_OPENGL
 #include "chrono_opengl/ChOpenGLWindow.h"
 #endif
 
+#include "utilities/UtilityFunctions.h"
+
 enum TestType {LAYER, FUNNEL, DROP, CASCADE};
-TestType workcase = TestType::FUNNEL;
+TestType workcase = TestType::DROP;
 using namespace chrono;
 using namespace postprocess;
 
@@ -51,13 +54,13 @@ using std::cout;
 using std::endl;
 
 int num_threads = 40;
-ChMaterialSurface::ContactMethod method = ChMaterialSurface::SMC;
+ChMaterialSurface::ContactMethod method = ChMaterialSurface::NSC;
 // PovRay Output
 bool povray_output = false;
 // Material
 bool use_mat_properties = true;
 // Render 
-bool render = false;
+bool render = true;
 // Tracking Granule
 bool track_granule = false;
 // Roughness
@@ -86,7 +89,7 @@ ChVector<> inertia_g = 0.4 * mass_g * radius_g * radius_g * ChVector<>(1, 1, 1);
 int num_layers = 10;
 
 // Terrain contact properties---Default Ones are commented out.
-float friction_terrain = 0.7f;// 
+float friction_terrain = 1.0f;// 
 float restitution_terrain = 0.0f;
 float Y_terrain = 8e4f;
 float nu_terrain = 0.3f;
@@ -96,7 +99,7 @@ float kt_terrain = 2.86e3f;// 2.86e6f;
 float gt_terrain = 1.0e2f;
 float coh_pressure_terrain = 10.f;// 0e3f;
 float coh_force_terrain = (float)(CH_C_PI * radius_g * radius_g) * coh_pressure_terrain;
-float rolling_friction = 0.01 * radius_g;
+float rolling_friction = 0.1 * radius_g;//increasing rolling_friction results in lowering time_step, WHY?
 
 //// Number of bins for broad-phase
 int factor = 2;
@@ -111,203 +114,13 @@ double Ra_r = 3.0*radius_g;//Default Size of particles.
 
 
 // ---------------------------FUNCTIONS--------------------------------
-double ComputeKineticEnergy(ChBody* body){
-
-	double mass = body->GetMass();
-	ChMatrix33<> I = body->GetInertia();
-	ChVector <> xdot = body->GetPos_dt();
-	ChVector <> omega = body->GetWvel_par();
-
-	double kin = mass* xdot.Dot(xdot) + omega.Dot(I.Matr_x_Vect(omega));
-	kin = kin / 2;	return kin;
-
-}
-void TimingHeader() {
-	printf("    TIME    |");
-	printf("    STEP |");
-	printf("   BROAD |");
-	printf("  NARROW |");
-	printf("  SOLVER |");
-	printf("  UPDATE |");
-	printf("# BODIES |");
-	printf("# CONTACT|");
-	printf(" # ITERS |");
-	printf("n\n");
-}
-
-void TimingOutput(chrono::ChSystem* mSys) {
-	double TIME = mSys->GetChTime();
-	double STEP = mSys->GetTimerStep();
-	double BROD = mSys->GetTimerCollisionBroad();
-	double NARR = mSys->GetTimerCollisionNarrow();
-	double SOLVER = mSys->GetTimerSolver();
-	double UPDT = mSys->GetTimerUpdate();
-	int REQ_ITS = 0;
-	int BODS = mSys->GetNbodies();
-	int CNTC = mSys->GetNcontacts();
-	if (chrono::ChSystemParallel* parallel_sys = dynamic_cast<chrono::ChSystemParallel*>(mSys)) {
-		REQ_ITS = std::static_pointer_cast<chrono::ChIterativeSolverParallel>(mSys->GetSolver())->GetTotalIterations();
-	}
-
-	printf("   %8.5f | %7.4f | %7.4f | %7.4f | %7.4f | %7.4f | %7d | %7d | %7d | %7.4f |\n", TIME, STEP, BROD, NARR,
-		SOLVER, UPDT, BODS, CNTC, REQ_ITS);
-}
-// Funnel utility Function
-void AddWall(ChVector<> lower, ChVector<> upper, std::shared_ptr<ChBody> body, double r) {
-
-	std::vector<ChVector<double>> cloud;
-	double th = 0.5*r;// or halve an input
-	// if statement only on lower 
-	if (lower.x() != 0. && lower.y() == 0.){
-		double ss = std::abs(lower.x());
-
-		cloud.push_back(lower + ChVector<>(-th, ss, 0.));
-		cloud.push_back(lower + ChVector<>(+th, ss, 0.));
-		cloud.push_back(lower + ChVector<>(-th, -ss, 0.));
-		cloud.push_back(lower + ChVector<>(+th, -ss, 0.));
-		double uu = std::abs(upper.x());
-		cloud.push_back(upper + ChVector<>(-th, uu, 0.));
-		cloud.push_back(upper + ChVector<>(+th, uu, 0.));
-		cloud.push_back(upper + ChVector<>(-th, -uu, 0.));
-		cloud.push_back(upper + ChVector<>(+th, -uu, 0.));
-
-	}
-
-	if (lower.x() == 0. && lower.y() != 0.){
-		double ss = std::abs(lower.y());
-		cloud.push_back(lower + ChVector<>(ss, -th, 0.));
-		cloud.push_back(lower + ChVector<>(ss, +th, 0.));
-		cloud.push_back(lower + ChVector<>(-ss, -th, 0.));
-		cloud.push_back(lower + ChVector<>(-ss, +th, 0.));
-		double uu = std::abs(upper.y());
-		cloud.push_back(upper + ChVector<>(uu, -th, 0.));
-		cloud.push_back(upper + ChVector<>(uu, +th, 0.));
-		cloud.push_back(upper + ChVector<>(-uu, -th, 0.));
-		cloud.push_back(upper + ChVector<>(-uu, +th, 0.));
-	}
-
-	// Add a check on cloud.size()==8;
-
-
-	body->GetCollisionModel()->AddConvexHull(cloud, ChVector<>(0, 0, 0), QUNIT);
-	//body->GetCollisionModel()->BuildModel();
-
-	auto shape = std::make_shared<ChTriangleMeshShape>();
-	collision::ChConvexHullLibraryWrapper lh;
-	lh.ComputeHull(cloud, shape->GetMesh());
-	body->AddAsset(shape);
-
-	body->AddAsset(std::make_shared<ChColorAsset>(0.5f, 0.0f, 0.0f));
-}
-// Particle Runtime Generation , case::DROP	
-int SpawnParticles(utils::Generator* gen) {
-	double dist = 2.3 * 1.01 * radius_g;
-
-	////gen->createObjectsBox(utils::POISSON_DISK,
-	////                     dist,
-	////                     ChVector<>(9, 0, 3),
-	////                     ChVector<>(0, 1, 0.5),
-	////                     ChVector<>(-initVel, 0, 0));
-	gen->createObjectsCylinderZ(utils::POISSON_DISK, dist, ChVector<>(0, 0, 0.15), 0.075f, 0, ChVector<>(0, 0, 0));
-	std::cout << "  total bodies: " << gen->getTotalNumBodies() << std::endl;
-
-	return gen->getTotalNumBodies();
-}
-// Funnel Generation , case::FUNNEL, 7.2r m/s speed.
-void CreateFunnel(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurface> material_terrain){
-	auto funnel = std::shared_ptr<ChBody>(system->NewBody());
-	system->AddBody(funnel);
-	funnel->SetIdentifier(-2);
-	funnel->SetPos(ChVector<>(0., 0., 2 * radius_g));
-	funnel->SetMass(1);
-	funnel->SetBodyFixed(false);
-	funnel->SetMaterialSurface(material_terrain);
-	switch (method) {
-		// Since it's not the contact btw funnel and particles what I'm interested in, I slow down mi-coefficient
-	case ChMaterialSurface::SMC: {
-										 funnel->GetMaterialSurfaceSMC()->SetFriction(.1f);
-										 break;
-	}
-	case ChMaterialSurface::NSC: {
-										 funnel->GetMaterialSurfaceNSC()->SetFriction(.1f);
-										 break;
-	}
-	}
-	funnel->SetCollide(true);
-	funnel->GetCollisionModel()->ClearModel();
-	// OpenGL does not accept more than ONE visualization shape per body
-	double half_low_size = 6 * radius_g;
-	double half_upp_size = 20 * radius_g;
-	double base2base_height = 100 * radius_g;
-	AddWall(ChVector<>(half_low_size, .0, .0), ChVector<>(half_upp_size, .0, base2base_height), funnel, radius_g);
-	AddWall(ChVector<>(0., half_low_size, .0), ChVector<>(0., half_upp_size, base2base_height), funnel, radius_g);
-	AddWall(ChVector<>(-half_low_size, .0, .0), ChVector<>(-half_upp_size, .0, base2base_height), funnel, radius_g);
-	AddWall(ChVector<>(0., -half_low_size, .0), ChVector<>(0., -half_upp_size, base2base_height), funnel, radius_g);
-	funnel->GetCollisionModel()->BuildModel();
-
-	//----------------
-	// Create the Funnel Movement: this should be a constant velocity trajectory in z direction
-	// 
-	// Linear actuator btw the container and the funnel, it simulates the raising of the latter which must be always closely over the sand heap top.
-	auto cont2fun = std::make_shared<ChLinkLockPrismatic>();
-	cont2fun->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
-	system->AddLink(cont2fun);
-	auto container2funnel = std::make_shared<ChLinkLinActuator>();
-	container2funnel->Initialize(funnel, container, false, ChCoordsys<>(funnel->GetPos(), QUNIT), ChCoordsys<>(container->GetPos(), QUNIT));
-	auto funnel_law = std::make_shared<ChFunction_Ramp>();
-	funnel_law->Set_ang(7.2*radius_g);
-	container2funnel->Set_lin_offset(Vlength(container->GetPos() - funnel->GetPos()));
-	container2funnel->Set_dist_funct(funnel_law);
-	system->AddLink(container2funnel);
-
-}
-// Hollowed Cylinder Generation , case::CASCADE
-void CreateTube(chrono::ChSystem* system, std::shared_ptr<ChBody> container, std::shared_ptr<ChMaterialSurface> material_terrain, double time_hold){	// Create TUBE body
-	auto tube = std::shared_ptr<ChBody>(system->NewBody());
-	system->AddBody(tube);
-	tube->SetIdentifier(-2);
-	tube->SetPos_dt(ChVector<>(.0, .0, 0.0));// Initial Value
-	tube->SetMass(1.0);
-	tube->SetBodyFixed(false);// true + actuator yields two bodies explode
-	tube->SetCollide(true);
-	tube->SetMaterialSurface(material_terrain);
-	tube->GetCollisionModel()->ClearModel();
-	ChQuaternion<> qtube;
-	qtube.Q_from_AngAxis(CH_C_PI / 2, ChVector<>(1, 0, 0));
-	tube->SetPos(ChVector<>(0.0, .0, .0));
-	tube->SetRot(qtube);
-	// In original file measures fulfill to those proposed by the cited article, here the same are adapted to the TR requirements.
-	for (int i = 0; i < 20; i++){
-		utils::AddTorusGeometry(tube.get(), .150, .005, 5 * 20, 360, ChVector<>(0, 2 * i * 0.005, 0.), ChQuaternion<>(1.0, 0., 0., .0), true);
-	}
-	//utils::AddTorusGeometry(tube.get(), .133 / 2, .005, 20,360,ChVector<>(0,0,0),ChQuaternion<>(1.0,.0,.0,.0),true);
-	tube->GetCollisionModel()->BuildModel();
-
-	// Create a prismatic actuator btw CONTAINER and TUBE
-	auto prismCT = std::make_shared<ChLinkLockPrismatic>();
-	prismCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), QUNIT));
-	system->AddLink(prismCT);
-	auto linCT = std::make_shared<ChLinkLinActuator>();
-	linCT->Initialize(tube, container, ChCoordsys<>(ChVector<>(.0, .0, 0.0), QUNIT));//m2 is the master
-	linCT->Set_lin_offset(0.0);
-	system->AddLink(linCT);
-	auto legge1 = std::make_shared<ChFunction_Const>();
-	legge1->Set_yconst(0.0);
-	auto legge2 = std::make_shared<ChFunction_Ramp>();
-	legge2->Set_ang(0.075);//.015 in origin
-	auto sequence = std::make_shared<ChFunction_Sequence>();
-	sequence->InsertFunct(legge1, time_hold, 1.0, true);
-	sequence->InsertFunct(legge2, 300, 1.0, true);
-
-
-	linCT->Set_dist_funct(sequence);
-}
+    // All functions are in UtilityFunctions.h file.
 // ---------------------------FUNCTIONS--------------------------------
 int main(int argc, char** argv) {
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
-	uint max_iteration_spinning = 200;
-	uint max_iteration_bilateral = 0;
+	uint max_iteration_spinning = 25;
+	uint max_iteration_bilateral = 100;
 	// Create output directories.
 	if (povray_output) {
 		if (ChFileutils::MakeDirectory(out_dir.c_str()) < 0) {
@@ -520,21 +333,25 @@ int main(int argc, char** argv) {
 		double time_to_plot = 0.;
 
 	switch (workcase) {
-	case TestType::LAYER: {			
-								  // Create particles in layers until reaching the desired number of particles
-								  ChVector<> hdims(hdimX / 4.35 - r, hdimY / 4.35 - r, 0);
+	case TestType::LAYER: {
+		double divide;
+		if (radius_g == 0.01){ divide = 4.35; }
+		else{ divide = 1.35; }
+		
+								// Create particles in layers until reaching the desired number of particles
+								  ChVector<> hdims(hdimX / divide - r, hdimY / divide - r, 0);
 								  ChVector<> center(0, 0, 2 * r);
 
 								  for (int il = 0; il < num_layers; il++) {
-								  gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
-								  center.z() += 2 * r;
+								  gen.createObjectsBox(utils::HCP_PACK, 2 * r, center, hdims);
+								  center.z() += 2 * radius_g;
 								  // shrink uniformly the upper layer
 								  hdims.x() -= 2 * r;
 								  hdims.y() -= 2 * r;
 								  // move the center abscissa by a 1*r 
-								  center.x() += r * pow(-1, il);
-								  if (method == ChMaterialSurface::NSC){ time_step = 1e-3; }
-
+								  // center.x() += r * pow(-1, il);
+								  if (method == ChMaterialSurface::NSC){ time_step = .75e-3; }
+								  if (radius_g == 0.05){ time_end = 20.50; }
 
 	}
 
@@ -544,7 +361,7 @@ int main(int argc, char** argv) {
 								   ChVector<> hdims(10 * r - r, 10 * r - r, 10 * r);
 								   ChVector<> center(0., 0., 52 * r + 25*r);//10r is the height of the funnel.
 
-								   CreateFunnel(system, container, material_body);
+								   CreateFunnel(system, container, material_body, method, radius_g);
 								   gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.4 * r, center, 10 * r, center.z() - .05 - 25*r);
 
 								   time_to_plot = 1.75;
@@ -562,7 +379,7 @@ int main(int argc, char** argv) {
 								 std::cout << "Generated particles:  " << num_particles << std::endl;
 								 time_end = 10.00;
 								 time_to_plot = 6.5;
-								 if (method == ChMaterialSurface::NSC){ time_step = 1e-3; }
+								 if (method == ChMaterialSurface::NSC){ time_step = .5e-3; }
 								  break;
 		}
 		case TestType::CASCADE: {	double time_hold = 2.0;
@@ -674,7 +491,7 @@ int main(int argc, char** argv) {
 		// ------------------------OPTIONAL IF STATEMENT FUNCTIONS
 		// SPAWN PARTICLES-optional DROP case
 		if (workcase == DROP && sim_frame % (int)(.1 / time_step) == 0 && system->GetChTime() < 6.00){
-			SpawnParticles(&gen);
+			SpawnParticles(&gen, radius_g);
 		}
 
 				// ---------------------------PLOTTING-WRITING FUNCTIONS AFTER ASSESSMENT-------------------------------------------------- //
@@ -697,6 +514,7 @@ int main(int argc, char** argv) {
 			//		avkinenergy /= particlelist.size();
 			avkinenergy /= list->size();
 			mfun.AddPoint(system->GetChTime(), avkinenergy);
+			avkinenergy = 0.;//Reset Ke
 			auto biggest = std::max_element(std::begin(zs), std::end(zs));
 			zfun.AddPoint(system->GetChTime(), *biggest);
 

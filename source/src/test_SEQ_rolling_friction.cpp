@@ -91,17 +91,17 @@ using std::endl;
 
 int main(int argc, char** argv) {
 	double time_step = 1e-3;
-	double time_end = 3.00;
+	double time_end = 1.00;
 
 	uint max_iteration_normal = 0;
 	uint max_iteration_sliding = 0;
 	uint max_iteration_spinning = 100;
-	uint max_iteration_bilateral = 0;
+	uint max_iteration_bilateral = 100;
 
 
 
 	int num_threads = 4;
-	ChMaterialSurface::ContactMethod method = ChMaterialSurface::NSC;//SMC
+	ChMaterialSurface::ContactMethod method = ChMaterialSurface::NSC;//SMC(rolling friction not available)
 	bool use_mat_properties = true;
 	bool render = true;
 	bool track_granule = false;
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 	double mass = density * (4.0 / 3.0) * CH_C_PI * pow(radius_g, 3);
 	double inertia = (2.0 / 5.0) * mass * pow(radius_g, 2);
 
-	double rolling_friction = 0.05 * radius_g;//RAISING mi_r=.5*r, BALLS TREPASS FLOOR.WHY?? 
+	double rolling_friction = 0.075 * radius_g;//RAISING mi_r=.5*r, BALLS TREPASS FLOOR.WHY????Still with mi_r=.1*r) 
 	double Ra_d = 5.0*radius_g;//Distance from centers of particles.
 	double Ra_r = 3.0*radius_g;//Default Size of particles.
 
@@ -145,8 +145,8 @@ int main(int argc, char** argv) {
 	// ----------------
 
 	// Container dimensions
-	double hdimX = 5.0;
-	double hdimY = 5.0;
+	double hdimX = 1.0;
+	double hdimY = 1.0;
 	double hdimZ = 0.5;
 	double hthick = 0.25;
 
@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
 
 	// Terrain contact properties---Default Ones are commented out.
 	float friction_terrain = 0.7f;// (H,W) requires mi=.70;
-	float restitution_terrain = 0.0f;
+	float restitution_terrain = 0.5f;
 	float Y_terrain = 1e6f;
 	float nu_terrain = 0.3f;
 	float kn_terrain = 1.0e7f;// 1.0e7f;
@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
 	std::cout << "Broad-phase bins: " << binsX << " x " << binsY << " x " << binsZ << std::endl;
 
 	// --------------------------
-	// Create the parallel system
+	// Create the serial system
 	// --------------------------
 
 	// Create system and set method-specific solver settings
@@ -194,16 +194,9 @@ int main(int argc, char** argv) {
 	}
 	case ChMaterialSurface::NSC: {
 		ChSystemNSC* sys = new ChSystemNSC;
-		//sys->GetSettings()->solver.solver_mode = SolverMode::SPINNING;	
 		sys->SetMaxItersSolverSpeed(100);
-		//sys->GetSettings()->solver.max_iteration_normal = max_iteration_normal;
-		//sys->GetSettings()->solver.max_iteration_sliding = max_iteration_sliding;
-		//sys->GetSettings()->solver.max_iteration_spinning = max_iteration_spinning;
 
-		//sys->GetSettings()->solver.alpha = 0;
-			//sys->SetMinBounceSpeed(0.1);
 		sys->SetMaxPenetrationRecoverySpeed(0.1);
-		//sys->GetSettings()->collision.collision_envelope = 0.05 * radius_g;//0.1
 		sys->SetSolverType(ChSolver::Type::APGD);
 		system = sys;
 
@@ -212,12 +205,8 @@ int main(int argc, char** argv) {
 	}
 
 	system->Set_G_acc(ChVector<>(0, 0, -9.81));
-	//system->GetSettings()->perform_thread_tuning = false;
-	//system->GetSettings()->solver.use_full_inertia_tensor = false;
 	system->SetTol(.1);
 	system->SetMaxiter(max_iteration_bilateral);
-	//system->GetSettings()->collision.narrowphase_algorithm = NarrowPhaseType::NARROWPHASE_HYBRID_MPR;
-	//system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ); 
 
 
 	// Create contact material for terrain
@@ -266,10 +255,7 @@ int main(int argc, char** argv) {
 	// it's not the problem for using all iterations
 	container->SetMaterialSurface(material_terrain);
 	
-	/*container->GetMaterialSurface()->SetFriction(friction_terrain);
-	container->GetMaterialSurface()->SetRollingFriction(rolling_friction);
-	container->GetMaterialSurface()->SetSpinningFriction(rolling_friction);
-	*/container->GetCollisionModel()->ClearModel();
+	container->GetCollisionModel()->ClearModel();
 	
 	// Bottom box
 	utils::AddBoxGeometry(container.get(), ChVector<>(hdimX, hdimY, 10*radius_g), ChVector<>(0, 0, 0*radius_g),
@@ -309,9 +295,26 @@ int main(int argc, char** argv) {
 	m0->setDefaultMaterial(material_terrain);
 	m0->setDefaultDensity(density);
 	m0->setDefaultSize(radius_g);
-	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.9 * 1.01 *radius_g, ChVector<>(.0, .0, 10 * radius_g), 0.030, 9 * radius_g);
-	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
+#ifdef USE_LAYERING
+	ChVector<> center(.0, .0, 10 * radius_g);
+	double r(1.01 * radius_g);
+	ChVector<> hdims(10*r -r, 10*r -r, 0.0);
+	int num_layers(2);
+	for (int il = 0; il < num_layers; il++) {
+			gen.createObjectsBox(utils::POISSON_DISK, 2 * r, center, hdims);
+			center.z() += 2 * r;
+			// shrink uniformly the upper layer
+			hdims.x() -= 2 * r;
+			hdims.y() -= 2 * r;
+			// move the center abscissa by a 1*r 
+			center.x() += r * pow(-1, il);
+		}
+#else
+	gen.createObjectsCylinderZ(utils::POISSON_DISK, 2.2 * 1.01 *radius_g, ChVector<>(.0, .0, 10 * radius_g), 0.030, 9 * radius_g);
 
+#endif // USE_LAYERING
+
+	// Create particle bodylist for Computing Averaging Kinetic,Potential Energy
 	std::vector<std::shared_ptr<ChBody>> particlelist;
 	auto original_bodylist = system->Get_bodylist();
 	//for (int i = 0; i < original_bodylist->size(); i++) { auto mbody = std::shared_ptr<ChBody>(original_bodylist[original_bodylist.begin()+i]);
@@ -329,6 +332,7 @@ int main(int argc, char** argv) {
 	GetLog() << "Container rolling friction  : " << rcon << "\n";
 
 #endif // USE_SINGLE_SPHERE
+	GetLog() << "Created Particles : " << particlelist.size() << "\n";
 
 	
 #ifdef CHRONO_IRRLICHT
@@ -340,7 +344,7 @@ int main(int argc, char** argv) {
 	ChIrrWizard::add_typical_Logo(application.GetDevice());
 	ChIrrWizard::add_typical_Sky(application.GetDevice());
 	ChIrrWizard::add_typical_Lights(application.GetDevice());
-	application.AddTypicalCamera(core::vector3df(.5, 0, 0), core::vector3df(0, 0, 0)); //'camera' location            // "look at" location
+	application.AddTypicalCamera(core::vector3df(.5, .3, 0.), core::vector3df(0, 0, 0)); //'camera' location            // "look at" location
 	
 	//ChIrrWizard::add_typical_Camera(application.GetDevice(), core::vector3df(0., +1.,.5));
 
@@ -409,6 +413,7 @@ int main(int argc, char** argv) {
 		avkinenergy /= list->size();
 #endif
 		mfun.AddPoint(system->GetChTime(), avkinenergy);
+		avkinenergy = 0;// reset Ke
 
 		cum_sim_time += system->GetTimerStep();
 		cum_broad_time += system->GetTimerCollisionBroad();

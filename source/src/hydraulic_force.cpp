@@ -43,96 +43,16 @@
 using namespace chrono;
 using namespace postprocess;
 #include "chrono/physics/ChLinkMarkers.h"
+
+#include "utilities/UtilityFunctions.h"
 // --------------------------------------------------------------------------
 using std::cout;
 using std::endl;
-// -------------------TIME SERIES STRUCTURE----------------------------
-struct TimeSeries {
-	TimeSeries() {}
-	TimeSeries(float t, float v)
-		: mt(t), mv(v) {}
-	float mt; float mv; 
-};
-// -------------------READ FILE FUNCTION----------------------------
-void ReadFile(const std::string& filename, std::vector<TimeSeries>& profile) {
-	std::ifstream ifile(filename.c_str());
-	std::string line;
-
-	while (std::getline(ifile, line)) {
-		std::istringstream iss(line);
-		float ttime, vvalue;
-		iss >> ttime >> vvalue ;
-		if (iss.fail())
-			break;
-		profile.push_back(TimeSeries(ttime, vvalue));
-	}
-	ifile.close();
-
-
-
-}
 // -------------------ENUMERATOR ----------------------------
 enum FunctionSettingMode {INFILE , INPLACE};
 FunctionSettingMode mode = INFILE;
 bool render = true;
 
-// Class implemented to compute hydraulic force
-class myHYDRforce {
-	public:
-	virtual ~myHYDRforce() {}
-		
-
-	virtual double operator()(double time,
-							double pressureH,
-							double areaH)
-	{
-		double force = pressureH * areaH; //pH*aH-pR*aR, formula for piston
-		return force;
-	}
-
-};
-// Class implemented to set up a hydraulic/data input force between two markers
-class myHYDRactuator : public ChLinkMarkers{
-
-public:
-	myHYDRactuator() : m_force(0), m_force_fun(NULL), m_pressureH(NULL), m_pressureR(NULL), m_areaH(9), m_areaR(10) {};
-	myHYDRactuator(const myHYDRactuator& other);
-	virtual ~myHYDRactuator() {}
-
-
-	void SetAreaH(double areaH){ m_areaH = areaH; }
-	void SetAreaR(double areaR){ m_areaR = areaR; }
-	double GetAreaH(){ return m_areaH; }
-	double GetAreaR(){ return m_areaR; }
-
-	void Set_HYDRforce(myHYDRforce* force) { m_force_fun = force; }
-	void Set_PressureH(ChFunction* pressureH){ m_pressureH = pressureH; }
-	void Set_PressureR(ChFunction* pressureR){ m_pressureR = pressureR; }
-
-
-	void UpdateForces(double time)override{
-
-		// Allow the base class to update itself (possibly adding its own forces)
-		ChLinkMarkers::UpdateForces(time);
-
-		// Get the pressure information
-		double pressureH = m_pressureH->Get_y(time);
-		// Invoke the provided functor to evaluate force
-		m_force = m_force_fun ? (*m_force_fun)(time, pressureH, m_areaH) : 0;
-
-		// Add to existing force.
-		C_force += m_force * relM.pos.GetNormalized();
-
-	}
-protected:
-	myHYDRforce* m_force_fun;  ///< functor for force calculation
-	double m_areaH = 10.;
-	double m_areaR = 9.;
-	double m_force;  ///< functor for force calculation
-	ChFunction* m_pressureH;
-	ChFunction* m_pressureR;
-
-};
 
 int main(int argc, char** argv) {
 	int num_threads = 4;
@@ -154,7 +74,7 @@ int main(int argc, char** argv) {
 		ReadFile(act_input, input);
 		for (int i = 0; i < input.size(); i++){
 					// scalar gain to be observable in simulation
-			pressure.AddPoint(input[i].mt, 10 *input[i].mv);}
+			pressure.AddPoint(input[i].mt, 1e6*input[i].mv);}
 						}
 	else if(mode == INPLACE){
 		ChFunction_Sine pressure;
@@ -240,6 +160,7 @@ int main(int argc, char** argv) {
 
 	// Create the to bodies: they'll be connected by a ChLinkSpringCB-like element
 	              //or a ChlinkLinActuator(depending on USE_DISPLACEMENT flag)
+	ChQuaternion<> angle_piston(Q_from_AngY(CH_C_PI / 2));//Q_from_AngY(CH_C_PI / 4)
 	// An alternative would be overload ChLinkLinActuator with a UpdateForce method
 	auto bodyA = std::shared_ptr<ChBody>(system->NewBody()); bodyA->SetBodyFixed(true);
 	bodyA->SetCollide(true);
@@ -257,7 +178,7 @@ int main(int argc, char** argv) {
 	bodyB->GetCollisionModel()->BuildModel();
 
 	auto prismatic = std::make_shared<ChLinkLockPrismatic>();
-	prismatic->Initialize(bodyA, bodyB, ChCoordsys<>(ChVector<>(0, 0, 0), Q_from_AngY(CH_C_PI / 4)));
+	prismatic->Initialize(bodyA, bodyB, ChCoordsys<>(ChVector<>(0, 0, 0), angle_piston));
 	system->AddLink(prismatic);
 
 	//Setup the function--Old
@@ -269,7 +190,7 @@ int main(int argc, char** argv) {
 			std::cout << input[4].mv << std::endl;
 
 			for (int i = 0; i < input.size(); i++){
-				pres_function->AddPoint(input[i].mt, input[i].mv);
+				pres_function->AddPoint(input[i].mt, 10*input[i].mv);
 			}
 		}
 	
@@ -278,7 +199,7 @@ int main(int argc, char** argv) {
 	// Choose between the two type of connections: check distances and orientations
 #ifdef USE_DISPLACEMENT
 	auto linAB = std::make_shared<ChLinkLinActuator>(); 
-	linAB->Initialize(bodyA, bodyB, false, ChCoordsys<>(VNULL, Q_from_AngY(CH_C_PI / 4)), ChCoordsys<>(bodyB->GetPos(), Q_from_AngY(CH_C_PI / 4)));
+	linAB->Initialize(bodyA, bodyB, false, ChCoordsys<>(VNULL, angle_piston), ChCoordsys<>(bodyB->GetPos(), angle_piston));
 	linAB->Set_lin_offset(5.);//safe
 	system->AddLink(linAB);
 	linAB->Set_dist_funct(pres_function);
@@ -289,7 +210,8 @@ int main(int argc, char** argv) {
 #else
 	myHYDRforce force;
 	auto linAB = std::make_shared<myHYDRactuator>();
-	linAB->Initialize(bodyA, bodyB, bodyB->GetCoord());
+	// ChLinkMarkers child, force applied on slave m1
+	linAB->Initialize(bodyB, bodyA, ChCoordsys<>(ChVector<>(0, 0, 0), angle_piston));
 	linAB->Set_HYDRforce(&force);
 	linAB->Set_PressureH(&pressure);
 	system->AddLink(linAB);
@@ -299,12 +221,16 @@ int main(int argc, char** argv) {
 
 
 	// Simulation
+	ChFunction_Recorder pforce;
+	ChFunction_Recorder bxpos;
 
 	while (system->GetChTime() < 5.) {
 
 		system->DoStepDynamics(.001);
-		std::cout << bodyB->GetPos().x() << std::endl;
-
+		//std::cout << bodyB->GetPos().x() << std::endl;
+		//std::cout << linAB->GetC_force().z() << std::endl;
+		pforce.AddPoint(system->GetChTime(), linAB->GetC_force().z());
+		bxpos.AddPoint(system->GetChTime(), bodyB->GetPos().x());
 #ifdef CHRONO_OPENGL
 		if (render) {
 			opengl::ChOpenGLWindow& gl_window = opengl::ChOpenGLWindow::getInstance();
@@ -317,6 +243,14 @@ int main(int argc, char** argv) {
 		}
 #endif
 	}
+	// Gnuplot--IT DOESN'T WORK WITH ChFunction_Sine or others.
+	ChGnuPlot fplot("__tmp_gnuplot_5.gpl");
+	fplot.SetGrid();
+	fplot.Plot(pforce, "pneumatic Force", " with lines lt -1 lc rgb'#00AAEE' ");
+
+	ChGnuPlot xplot("__tmp_gnuplot_6.gpl");
+	xplot.SetGrid();
+	xplot.Plot(bxpos, "x Position", " with lines lt -1 lc rgb'#00AAEE' ");
 
 
 	return 0;

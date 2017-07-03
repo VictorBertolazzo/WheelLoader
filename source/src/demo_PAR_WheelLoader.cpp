@@ -27,6 +27,7 @@
 #include "chrono_parallel/physics/ChSystemParallel.h"
 #include "chrono_parallel/solver/ChSystemDescriptorParallel.h"
 #include "chrono_parallel/collision/ChNarrowphaseRUtils.h"
+#include "chrono_parallel/collision/ChBroadphaseUtils.h"
 
 // Chrono::Parallel OpenGL header files
 //#undef CHRONO_OPENGL
@@ -55,6 +56,7 @@
 // 
 #include "subsystems/Articulated_Front.h"
 #include "subsystems/Articulated_Rear.h"
+
 
 using namespace chrono;
 using namespace chrono::collision;
@@ -108,14 +110,14 @@ ChVector<> inertia_g = 0.4 * mass_g * r_g * r_g * ChVector<>(1, 1, 1);
 
 float mu_g = 0.8f;
 
-unsigned int num_particles = 1e3; //// 40000;
+unsigned int num_particles = 10e3; //// 40000;
 
 // -----------------------------------------------------------------------------
 // Specification of the vehicle model
 // -----------------------------------------------------------------------------
 
 // Initial vehicle position and orientation
-ChVector<> initLoc(-hdimX + 4.5, 0, 1);
+ChVector<> initLoc(-hdimX + 4.5, 0, .5);//z=1
 ChQuaternion<> initRot(1, 0, 0, 0);
 
 // Simple powertrain model
@@ -312,12 +314,17 @@ int main(int argc, char* argv[]) {
 #else
 	system->GetSettings()->solver.contact_force_model = ChSystemSMC::PlainCoulomb;
 #endif
+	// BRAODPHASE UTILS--still not used--future task
+	vec3 bins = function_Compute_Grid_Resolution(12000, real3(hdimX, hdimY, hdimZ), 1.);
 	int factor = 2;
 	int binsX = (int)std::ceil(hdimX / r_g) / factor;
 	int binsY = (int)std::ceil(hdimY / r_g) / factor;
 	int binsZ = 1;
 
 	system->GetSettings()->collision.bins_per_axis = vec3(binsX, binsY, binsZ);
+	//system->GetSettings()->collision.bins_per_axis = bins;
+
+
 
 #endif
 
@@ -365,47 +372,49 @@ int main(int argc, char* argv[]) {
 #endif
 
 	// Create the terrain
-	RigidTerrain terrain(front_side.GetSystem());
-	terrain.SetContactFrictionCoefficient(0.9f);
-	terrain.SetContactRestitutionCoefficient(0.01f);
-	terrain.SetContactMaterialProperties(2e7f, 0.3f);
-	terrain.SetColor(ChColor(0.5f, 0.5f, 1));
-	terrain.SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
-	terrain.Initialize(terrainHeight, terrainLength, terrainWidth);
+	
+	//RigidTerrain terrain(front_side.GetSystem());
+	//terrain.SetContactFrictionCoefficient(0.9f);
+	//terrain.SetContactRestitutionCoefficient(0.01f);
+	//terrain.SetContactMaterialProperties(2e7f, 0.3f);
+	//terrain.SetColor(ChColor(0.5f, 0.5f, 1));
+	//terrain.SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+	//terrain.Initialize(terrainHeight, terrainLength, terrainWidth);
 
-	//// Ground body
-	//auto ground = std::shared_ptr<ChBody>(system->NewBody());
-	//ground->SetIdentifier(-1);
-	//ground->SetBodyFixed(true);
-	//ground->SetCollide(true);
+	// Ground body
+	auto ground = std::shared_ptr<ChBody>(front_side.GetSystem()->NewBody());
+	ground->SetIdentifier(-1);
+	ground->SetBodyFixed(true);
+	ground->SetCollide(true);
 
-	//ground->SetMaterialSurface(mat_g);
+	ground->SetMaterialSurface(mat_g);
 
-	//ground->GetCollisionModel()->ClearModel();
-	terrain.GetGroundBody()->GetCollisionModel()->ClearModel();
+	ground->GetCollisionModel()->ClearModel();
+
+	//terrain.GetGroundBody()->GetCollisionModel()->ClearModel();
 
 	// Bottom box
-	utils::AddBoxGeometry(terrain.GetGroundBody().get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
+	utils::AddBoxGeometry(ground.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
 		ChQuaternion<>(1, 0, 0, 0), true);
 	if (terrain_type == GRANULAR_TERRAIN) {
 		// Front box
-		utils::AddBoxGeometry(terrain.GetGroundBody().get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+		utils::AddBoxGeometry(ground.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
 			ChVector<>(hdimX + hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), visible_walls);
 		// Rear box
-		utils::AddBoxGeometry(terrain.GetGroundBody().get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
+		utils::AddBoxGeometry(ground.get(), ChVector<>(hthick, hdimY, hdimZ + hthick),
 			ChVector<>(-hdimX - hthick, 0, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0),
 			visible_walls);
 		// Left box
-		utils::AddBoxGeometry(terrain.GetGroundBody().get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+		utils::AddBoxGeometry(ground.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
 			ChVector<>(0, hdimY + hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0), visible_walls);
 		// Right box
-		utils::AddBoxGeometry(terrain.GetGroundBody().get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
+		utils::AddBoxGeometry(ground.get(), ChVector<>(hdimX, hthick, hdimZ + hthick),
 			ChVector<>(0, -hdimY - hthick, hdimZ - hthick), ChQuaternion<>(1, 0, 0, 0),
 			visible_walls);
 	}
 
-	terrain.GetGroundBody()->GetCollisionModel()->BuildModel();
-	//ground->GetCollisionModel()->BuildModel();
+	//terrain.GetGroundBody()->GetCollisionModel()->BuildModel();
+	ground->GetCollisionModel()->BuildModel();
 
 	// Create the granular material.
 	double vertical_offset = 0;

@@ -30,8 +30,11 @@ SET(MODELS
     subsystems/Articulated_Rear.h
     subsystems/Articulated_Rear.cpp
 )
+ SET(UTILITIES
+ utilities/UtilityFunctions.h
+ )
 
-
+SOURCE_GROUP("utilities" FILES ${UTILITIES})
 SOURCE_GROUP("subsystems" FILES ${MODEL_FILES})
 SOURCE_GROUP("" FILES ${MODELS}.cpp ${MODEL_FILES})
 
@@ -78,7 +81,7 @@ foreach(PROGRAM ${MODELS})
 
   message(STATUS "...add ${PROGRAM}")
 
-  add_executable(${PROGRAM}  "${PROGRAM}.cpp" ${MODEL_FILES})
+  add_executable(${PROGRAM}  "${PROGRAM}.cpp" ${MODEL_FILES} ${UTILITIES})
   source_group(""  FILES "${PROGRAM}.cpp")
 
   set_target_properties(${PROGRAM} PROPERTIES
