@@ -371,8 +371,8 @@ int main(int argc, char* argv[]) {
 	mat_g->SetFriction(mu_g);
 #endif
 
-	// Create the terrain
-	
+	//// Create the terrain
+	//
 	//RigidTerrain terrain(front_side.GetSystem());
 	//terrain.SetContactFrictionCoefficient(0.9f);
 	//terrain.SetContactRestitutionCoefficient(0.01f);
@@ -380,10 +380,15 @@ int main(int argc, char* argv[]) {
 	//terrain.SetColor(ChColor(0.5f, 0.5f, 1));
 	//terrain.SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
 	//terrain.Initialize(terrainHeight, terrainLength, terrainWidth);
+	//terrain.GetGroundBody()->GetCollisionModel()->ClearModel();
+
+	//auto ground = std::shared_ptr<ChBody>(terrain.GetGroundBody());
+    ///---------------------------OR------------------------------------
 
 	// Ground body
 	auto ground = std::shared_ptr<ChBody>(front_side.GetSystem()->NewBody());
-	ground->SetIdentifier(-1);
+	system->Add(ground);
+	ground->SetIdentifier(-1); ground->SetName("Ground-Terrain");
 	ground->SetBodyFixed(true);
 	ground->SetCollide(true);
 
@@ -391,7 +396,6 @@ int main(int argc, char* argv[]) {
 
 	ground->GetCollisionModel()->ClearModel();
 
-	//terrain.GetGroundBody()->GetCollisionModel()->ClearModel();
 
 	// Bottom box
 	utils::AddBoxGeometry(ground.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
@@ -556,11 +560,11 @@ int main(int argc, char* argv[]) {
 
 		// Update modules (process inputs from other modules)
 		driver.Synchronize(time);
-
-		tire_FL->Synchronize(time, wheel_FL, terrain) ;//terrain if present
-		tire_FR->Synchronize(time, wheel_FR, terrain);
-		tire_RL->Synchronize(time, wheel_RL, terrain);
-		tire_RR->Synchronize(time, wheel_RR, terrain);
+        //------------COMMENT IF TERRAIN NOT PRESENT
+		//tire_FL->Synchronize(time, wheel_FL, terrain) ;
+		//tire_FR->Synchronize(time, wheel_FR, terrain);
+		//tire_RL->Synchronize(time, wheel_RL, terrain);
+		//tire_RR->Synchronize(time, wheel_RR, terrain);
 
 		powertrain.Synchronize(time, throttle_input, driveshaft_speed);
 
