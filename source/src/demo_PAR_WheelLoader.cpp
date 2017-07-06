@@ -83,7 +83,7 @@ using std::endl;
 enum TerrainType { RIGID_TERRAIN, GRANULAR_TERRAIN };
 
 // Type of terrain
-TerrainType terrain_type = GRANULAR_TERRAIN;
+TerrainType terrain_type = RIGID_TERRAIN;
 // Type of tire model (RIGID or FIALA)
 TireModelType tire_model = TireModelType::RIGID;
 
@@ -117,7 +117,7 @@ unsigned int num_particles = 10e3; //// 40000;
 // -----------------------------------------------------------------------------
 
 // Initial vehicle position and orientation
-ChVector<> initLoc(-hdimX + 4.5, 0, .5);//z=1
+ChVector<> initLoc(-hdimX + 4.5, 0, .35);//z=1
 ChQuaternion<> initRot(1, 0, 0, 0);
 
 // Simple powertrain model
@@ -128,7 +128,7 @@ std::string simplepowertrain_file("generic/powertrain/SimplePowertrain.json");
 // -----------------------------------------------------------------------------
 
 // Desired number of OpenMP threads (will be clamped to maximum available)
-int threads = 20;
+int threads = 1;
 
 // Perform dynamic tuning of number of threads?
 bool thread_tuning = false;
@@ -293,6 +293,7 @@ int main(int argc, char* argv[]) {
 		threads = max_threads;
 	system->SetParallelThreadNumber(threads);
 	CHOMPfunctions::SetNumThreads(threads);
+	//omp_set_num_threads(threads);
 	std::cout << "Using " << threads << " threads" << std::endl;
 
 	system->GetSettings()->perform_thread_tuning = thread_tuning;
@@ -371,7 +372,7 @@ int main(int argc, char* argv[]) {
 	mat_g->SetFriction(mu_g);
 #endif
 
-	//// Create the terrain
+	////---------------------CREATE THE TERRAIN----------------------------
 	//
 	//RigidTerrain terrain(front_side.GetSystem());
 	//terrain.SetContactFrictionCoefficient(0.9f);
@@ -383,7 +384,8 @@ int main(int argc, char* argv[]) {
 	//terrain.GetGroundBody()->GetCollisionModel()->ClearModel();
 
 	//auto ground = std::shared_ptr<ChBody>(terrain.GetGroundBody());
-    ///---------------------------OR------------------------------------
+
+    ///---------------------------OR CREATE A SIMPLE GROUND BODY------------------------
 
 	// Ground body
 	auto ground = std::shared_ptr<ChBody>(front_side.GetSystem()->NewBody());
@@ -396,7 +398,7 @@ int main(int argc, char* argv[]) {
 
 	ground->GetCollisionModel()->ClearModel();
 
-
+	//--------------------------COMMON GEOMETRY DEFINITION-----------------------
 	// Bottom box
 	utils::AddBoxGeometry(ground.get(), ChVector<>(hdimX, hdimY, hthick), ChVector<>(0, 0, -hthick),
 		ChQuaternion<>(1, 0, 0, 0), true);
@@ -417,7 +419,7 @@ int main(int argc, char* argv[]) {
 			visible_walls);
 	}
 
-	//terrain.GetGroundBody()->GetCollisionModel()->BuildModel();
+	//terrain.GetGroundBody()->GetCollisionModel()->BuildModel();// NO MORE NECESSARY
 	ground->GetCollisionModel()->BuildModel();
 
 	// Create the granular material.
@@ -603,7 +605,7 @@ int main(int argc, char* argv[]) {
 		sim_frame++;
 		exec_time += system->GetTimerStep();
 		num_contacts += system->GetNcontacts();
-		if (sim_frame == 363)
+		if (sim_frame == 85)// 172 if initLoc.z() == .5
 			GetLog() << "Stop here and debug"<< "\n";
 	}
 
